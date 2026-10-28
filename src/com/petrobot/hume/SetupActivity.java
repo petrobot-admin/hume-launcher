@@ -24,8 +24,10 @@ import java.util.List;
 
 /**
  * First-time setup, in the style of Apple TV's own setup: one question per page, a large title
- * and a short line of help at the top, choices as a centred list (white when focused), OK moves
- * on and Back goes back. Pages: Welcome (in many languages), your profile, look, top shelf, weather, presentation,
+ * and a short line of help at the top, choices as a centred list (white when focused), and the
+ * page's buttons (Back, Continue) as pills under it, so moving on never looks like a choice.
+ * Each row says what it is: an On/Off switch, a radio dot (one of a list), or an action with its
+ * state on the right ("Allow ›", "✓ Allowed"). Choices change in place; nothing moves on by itself. Pages: Welcome (in many languages), your profile, look, top shelf, weather, presentation,
  * home screen & permissions, done. Shown once; Settings \u2192 Home \u2192 Run Setup Again repeats it.
  */
 public class SetupActivity extends Activity {
@@ -97,8 +99,13 @@ public class SetupActivity extends Activity {
         index = Math.max(0, Math.min(i, steps.size() - 1));
         page.animate().cancel();
         page.removeAllViews();
+        firstChoice = null;
+        primaryButton = null;
+        buttonsFocus = null;
         steps.get(index).build();
-        // New page: slide and fade. Same page re-drawn after a switch: a quick fade only.
+        View f = firstChoice != null ? firstChoice : primaryButton;
+        if (f != null) f.requestFocus();
+        // New page: slide and fade. Same page re-drawn (back from a system screen): a quick fade only.
         page.setAlpha(dir == 0 ? 0.6f : 0f);
         page.setTranslationX(u(30) * dir);
         page.animate().alpha(1f).translationX(0).setDuration(dir == 0 ? 120 : 320).start();
@@ -108,21 +115,34 @@ public class SetupActivity extends Activity {
         show(index + 1, 1);
     }
 
+    void back() {
+        if (index > 0) show(index - 1, -1);
+    }
+
     @Override
     public void onBackPressed() {
-        if (index > 0) show(index - 1, -1);
-        // The first page has nowhere to go back to: setup stays until it is finished.
+        back();  // the first page has nowhere to go back to: setup stays until it is finished
     }
 
     @Override
     public void onRequestPermissionsResult(int code, String[] p, int[] r) {
-        if (index == 6) show(6, 0);  // refresh the ticks
+        if (index > 0) show(index, 0);  // show what is now allowed
+    }
+
+    /** Back from a system screen (a permission, Accessibility, choosing a city): show the new state. */
+    boolean leftForSystemScreen;
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        leftForSystemScreen = true;
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (index == 6) show(6, 0);
+        if (leftForSystemScreen && index > 0) show(index, 0);
+        leftForSystemScreen = false;
     }
 
     // ---------------------------------------------------------------- building blocks
@@ -149,7 +169,7 @@ public class SetupActivity extends Activity {
         t.setLineSpacing(0, 1.15f);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(u(520), ViewGroup.LayoutParams.WRAP_CONTENT);
         lp.topMargin = u(10);
-        lp.bottomMargin = u(26);
+        lp.bottomMargin = u(22);
         page.addView(t, lp);
         return t;
     }
@@ -159,64 +179,186 @@ public class SetupActivity extends Activity {
         l.setOrientation(LinearLayout.VERTICAL);
         l.setClipChildren(false);
         l.setClipToPadding(false);
-        if (page.findViewWithTag("list") == null) l.setTag("list");
         page.addView(l, new LinearLayout.LayoutParams(u(440), ViewGroup.LayoutParams.WRAP_CONTENT));
         return l;
     }
 
-    /** A choice row: title, optional detail and a tick; white with dark text when focused. */
-    View option(LinearLayout list, String label, String detail, boolean checked, Runnable action) {
-        LinearLayout r = new LinearLayout(this);
-        r.setOrientation(LinearLayout.HORIZONTAL);
-        r.setGravity(Gravity.CENTER_VERTICAL);
-        r.setFocusable(true);
-        r.setClickable(true);
-        r.setPadding(u(18), u(8), u(16), u(8));
-        GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(u(12));
-        bg.setColor(0x26FFFFFF);
-        r.setBackground(bg);
+    /** What a choice row's right side shows. */
+    static final int SWITCH = 0, RADIO = 1, ACTION = 2;
+
+    /** First choice on the page (or the selected one in a list), focused when the page opens. */
+    View firstChoice;
+    View primaryButton;
+    /** Called when the page's buttons take focus (e.g. Look puts back the chosen background). */
+    Runnable buttonsFocus;
+
+    /**
+     * A choice row. SWITCH: an On/Off switch, toggled in place. RADIO: one of a list, with a dot.
+     * ACTION: opens something (a dialog or a system screen); the right side says its state, e.g.
+     * "Allow ›" or "✓ Allowed". Moving on is never a row: it is the button under the list.
+     */
+    final class Row {
+        final LinearLayout view = new LinearLayout(SetupActivity.this);
+        final TextView label = new TextView(SetupActivity.this), detail = new TextView(SetupActivity.this);
+        final TextView status = new TextView(SetupActivity.this);
+        final FrameLayout track = new FrameLayout(SetupActivity.this);
+        final View knob = new View(SetupActivity.this);
+        final GradientDrawable bg = new GradientDrawable(), trackBg = new GradientDrawable(), knobBg = new GradientDrawable();
+        final int kind;
+        boolean on, focused, ok;
+
+        Row(int kind) {
+            this.kind = kind;
+        }
+
+        void set(boolean v) {
+            on = v;
+            paint();
+        }
+
+        /** ACTION rows: the right-hand text, green when done. */
+        void status(String s, boolean done) {
+            status.setText(s);
+            ok = done;
+            paint();
+        }
+
+        void detail(String s) {
+            detail.setText(s);
+            detail.setVisibility(s == null || s.isEmpty() ? View.GONE : View.VISIBLE);
+        }
+
+        void paint() {
+            bg.setColor(focused ? 0xF2FFFFFF : 0x26FFFFFF);
+            label.setTextColor(focused ? 0xFF111114 : Color.WHITE);
+            detail.setTextColor(focused ? 0x99111114 : 0x99FFFFFF);
+            int green = focused ? 0xFF1E9E48 : 0xFF30D158;
+            if (kind == SWITCH) {
+                trackBg.setColor(on ? green : focused ? 0x33111114 : 0x40FFFFFF);
+                knob.animate().translationX(on ? u(14) : 0).setDuration(150).start();
+            } else if (kind == RADIO) {
+                trackBg.setColor(on ? green : 0);
+                trackBg.setStroke(u(1.5f), on ? green : focused ? 0x80111114 : 0x80FFFFFF);
+                status.setText(on ? "✓" : "");
+                status.setTextColor(Color.WHITE);
+            } else {
+                status.setTextColor(ok ? green : focused ? 0x99111114 : 0x99FFFFFF);
+            }
+        }
+    }
+
+    Row row(LinearLayout list, String label, String detail, int kind, boolean on, Runnable action) {
+        Row r = new Row(kind);
+        LinearLayout v = r.view;
+        v.setOrientation(LinearLayout.HORIZONTAL);
+        v.setGravity(Gravity.CENTER_VERTICAL);
+        v.setFocusable(true);
+        v.setClickable(true);
+        v.setPadding(u(18), u(8), u(16), u(8));
+        r.bg.setCornerRadius(u(12));
+        v.setBackground(r.bg);
         LinearLayout texts = new LinearLayout(this);
         texts.setOrientation(LinearLayout.VERTICAL);
-        TextView l = new TextView(this);
-        l.setText(label);
-        l.setTextColor(Color.WHITE);
-        l.setTypeface(Ui.font(this, "medium"));
-        Ui.textSize(l, 15);
-        texts.addView(l);
-        TextView d = null;
-        if (detail != null && !detail.isEmpty()) {
-            d = new TextView(this);
-            d.setText(detail);
-            d.setTextColor(0x99FFFFFF);
-            d.setTypeface(Ui.font(this, "regular"));
-            Ui.textSize(d, 12);
-            d.setSingleLine(true);
-            d.setEllipsize(TextUtils.TruncateAt.END);
-            texts.addView(d);
+        r.label.setText(label);
+        r.label.setTypeface(Ui.font(this, "medium"));
+        Ui.textSize(r.label, 15);
+        texts.addView(r.label);
+        r.detail.setTypeface(Ui.font(this, "regular"));
+        Ui.textSize(r.detail, 12);
+        r.detail.setSingleLine(true);
+        r.detail.setEllipsize(TextUtils.TruncateAt.END);
+        texts.addView(r.detail);
+        r.detail(detail);
+        v.addView(texts, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        if (kind == SWITCH) {
+            // A small On/Off switch (track and knob).
+            r.trackBg.setCornerRadius(u(9));
+            r.track.setBackground(r.trackBg);
+            r.knobBg.setShape(GradientDrawable.OVAL);
+            r.knobBg.setColor(Color.WHITE);
+            r.knob.setBackground(r.knobBg);
+            FrameLayout.LayoutParams klp = new FrameLayout.LayoutParams(u(14), u(14), Gravity.CENTER_VERTICAL);
+            klp.leftMargin = u(2);
+            r.track.addView(r.knob, klp);
+            r.knob.setTranslationX(on ? u(14) : 0);
+            v.addView(r.track, new LinearLayout.LayoutParams(u(32), u(18)));
+        } else if (kind == RADIO) {
+            r.trackBg.setShape(GradientDrawable.OVAL);
+            r.status.setBackground(r.trackBg);
+            r.status.setGravity(Gravity.CENTER);
+            r.status.setTypeface(Ui.font(this, "semibold"));
+            Ui.textSize(r.status, 11);
+            v.addView(r.status, new LinearLayout.LayoutParams(u(18), u(18)));
+        } else {
+            r.status.setTypeface(Ui.font(this, "medium"));
+            Ui.textSize(r.status, 13);
+            v.addView(r.status);
         }
-        r.addView(texts, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        TextView tick = new TextView(this);
-        tick.setText(checked ? "\u2713" : "");
-        tick.setTextColor(0xFF30D158);
-        tick.setTypeface(Ui.font(this, "semibold"));
-        Ui.textSize(tick, 17);
-        r.addView(tick);
-        TextView dRef = d;
-        r.setOnFocusChangeListener((v, has) -> {
-            bg.setColor(has ? 0xF2FFFFFF : 0x26FFFFFF);
-            l.setTextColor(has ? 0xFF111114 : Color.WHITE);
-            if (dRef != null) dRef.setTextColor(has ? 0x99111114 : 0x99FFFFFF);
-            tick.setTextColor(has ? 0xFF1E9E48 : 0xFF30D158);
-            v.animate().scaleX(has ? 1.04f : 1f).scaleY(has ? 1.04f : 1f).setDuration(180).start();
+        r.on = on;
+        r.paint();
+        v.setOnFocusChangeListener((x, has) -> {
+            r.focused = has;
+            r.paint();
+            x.animate().scaleX(has ? 1.04f : 1f).scaleY(has ? 1.04f : 1f).setDuration(180).start();
         });
-        r.setOnClickListener(v -> action.run());
+        v.setOnClickListener(x -> action.run());
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                d == null ? u(46) : u(56));
+                detail == null || detail.isEmpty() ? u(46) : u(56));
         lp.bottomMargin = u(8);
-        list.addView(r, lp);
-        if (list.getChildCount() == 1) r.requestFocus();
+        list.addView(v, lp);
+        if (firstChoice == null || kind == RADIO && on) firstChoice = v;
         return r;
+    }
+
+    /** One of a list: selecting a row clears the others. */
+    void select(List<Row> group, Row chosen) {
+        for (Row r : group) r.set(r == chosen);
+    }
+
+    /**
+     * The page's buttons, under the choices: Back (from the second page on) and the main one.
+     * Pill buttons, so they never look like a choice; Down from the list reaches them.
+     */
+    void buttons(String primary, Runnable go) {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER);
+        bar.setClipChildren(false);
+        if (index > 0) bar.addView(button("Back", false, this::back));
+        primaryButton = button(primary, true, go);
+        bar.addView(primaryButton);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = u(14);
+        page.addView(bar, lp);
+    }
+
+    TextView button(String text, boolean primary, Runnable go) {
+        TextView b = new TextView(this);
+        b.setText(text);
+        b.setGravity(Gravity.CENTER);
+        b.setTypeface(Ui.font(this, primary ? "semibold" : "medium"));
+        Ui.textSize(b, 15);
+        b.setFocusable(true);
+        b.setClickable(true);
+        b.setMinWidth(u(150));
+        b.setPadding(u(26), 0, u(26), 0);
+        GradientDrawable g = new GradientDrawable();
+        g.setCornerRadius(u(20));
+        int idle = primary ? 0x59FFFFFF : 0x26FFFFFF;
+        g.setColor(idle);
+        b.setBackground(g);
+        b.setTextColor(Color.WHITE);
+        b.setOnFocusChangeListener((v, has) -> {
+            g.setColor(has ? 0xFFFFFFFF : idle);
+            b.setTextColor(has ? 0xFF111114 : Color.WHITE);
+            v.animate().scaleX(has ? 1.08f : 1f).scaleY(has ? 1.08f : 1f).setDuration(180).start();
+            if (has && buttonsFocus != null) buttonsFocus.run();
+        });
+        b.setOnClickListener(v -> go.run());
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, u(40));
+        lp.leftMargin = lp.rightMargin = u(8);
+        b.setLayoutParams(lp);
+        return b;
     }
 
     void dots() {
@@ -256,7 +398,7 @@ public class SetupActivity extends Activity {
         hi.setTranslationY(u(12));
         hi.animate().alpha(1f).translationY(0).setDuration(700).start();
         // "Welcome" in Indian and world languages, fading from one to the next.
-        String[] words = {"Welcome", "\u0938\u094d\u0935\u093e\u0917\u0924 \u0939\u0948", "\u09b8\u09cd\u09ac\u09be\u0997\u09a4\u09ae", "\u0bb5\u0bb0\u0bb5\u0bc7\u0bb1\u0bcd\u0b95\u0bbf\u0bb1\u0bcb\u0bae\u0bcd", "\u0c38\u0c4d\u0c35\u0c3e\u0c17\u0c24\u0c02", "\u0938\u094d\u0935\u093e\u0917\u0924 \u0906\u0939\u0947", "\u0ab8\u0acd\u0ab5\u0abe\u0a97\u0aa4 \u0a9b\u0ac7", "\u0cb8\u0ccd\u0cb5\u0cbe\u0c97\u0ca4", "\u0d38\u0d4d\u0d35\u0d3e\u0d17\u0d24\u0d02", "\u0a1c\u0a40 \u0a06\u0a07\u0a06\u0a02 \u0a28\u0a42\u0a70", "Bienvenue", "Bienvenido", "Willkommen", "\u3088\u3046\u3053\u305d", "Benvenuto", "Bem-vindo", "\u6b22\u8fce"};
+        String[] words = {"Welcome", "स्वागत है", "স্বাগতম", "வரவேற்கிறோம்", "స్వాగతం", "स्वागत आहे", "સ્વાગત છે", "ಸ್ವಾಗತ", "സ്വാഗതം", "ਜੀ ਆਇਆਂ ਨੂੰ", "Bienvenue", "Bienvenido", "Willkommen", "ようこそ", "Benvenuto", "Bem-vindo", "欢迎"};
         int[] k = {0};
         Runnable[] cycle = new Runnable[1];
         cycle[0] = () -> {
@@ -268,10 +410,9 @@ public class SetupActivity extends Activity {
             handler.postDelayed(cycle[0], 2200);
         };
         handler.postDelayed(cycle[0], 2400);
-        TextView s = subtitle("Let\u2019s set up Hume Launcher.");
+        TextView s = subtitle("Let’s set up Hume Launcher. It takes about a minute.");
         Ui.textSize(s, 17);
-        LinearLayout l = list();
-        option(l, "Get Started", null, false, this::next);
+        buttons("Get Started", this::next);
         View mid = new View(this);
         page.addView(mid, new LinearLayout.LayoutParams(1, 0, 1f));
         TextView by = new TextView(this);
@@ -285,10 +426,12 @@ public class SetupActivity extends Activity {
 
     void profile() {
         title("Create Your Profile");
-        subtitle("Your name and an avatar. Each profile keeps its own apps, background and Home Screen. Up to three people can have one.");
+        subtitle("Pick a name and an avatar. Each profile keeps its own apps, background and Home Screen; up to three people can have one.");
         Profiles.Profile p = Profiles.current(this);
         LinearLayout l = list();
-        option(l, "Name", p.name, false, () -> {
+        Row name = row(l, "Name", null, ACTION, false, () -> { });  // its click is set below (needs the row)
+        name.status(p.name + "  ›", false);
+        name.view.setOnClickListener(v -> {
             EditText in = new EditText(this);
             in.setSingleLine(true);
             in.setText(p.name);
@@ -304,18 +447,27 @@ public class SetupActivity extends Activity {
                         if (!n.isEmpty()) {
                             p.name = n;
                             Profiles.update(this, p);
+                            name.status(n + "  ›", false);
                         }
-                        show(index, 0);
                     }).setNegativeButton("Cancel", null).show();
             in.requestFocus();
         });
-        // Avatar: a row of emoji, the current one ringed.
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER);
-        row.setClipChildren(false);
+        // Avatar: a row of emoji; the chosen one is ringed and stays ringed as you move.
+        TextView hint = new TextView(this);
+        hint.setText("Avatar");
+        hint.setTextColor(0x99FFFFFF);
+        hint.setTypeface(Ui.font(this, "regular"));
+        Ui.textSize(hint, 12);
+        LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        hlp.topMargin = u(6);
+        page.addView(hint, hlp);
+        LinearLayout avatars = new LinearLayout(this);
+        avatars.setOrientation(LinearLayout.HORIZONTAL);
+        avatars.setGravity(Gravity.CENTER);
+        avatars.setClipChildren(false);
         List<String> choices = new ArrayList<>(Profiles.freeEmojis(this, p.id));
         if (!choices.contains(p.emoji)) choices.add(0, p.emoji);
+        List<GradientDrawable> rings = new ArrayList<>();
         for (int i = 0; i < Math.min(8, choices.size()); i++) {
             String e = choices.get(i);
             TextView t = new TextView(this);
@@ -326,81 +478,109 @@ public class SetupActivity extends Activity {
             t.setClickable(true);
             GradientDrawable g = new GradientDrawable();
             g.setShape(GradientDrawable.OVAL);
-            g.setColor(e.equals(p.emoji) ? 0x59FFFFFF : 0x1FFFFFFF);
+            g.setColor(0x1FFFFFFF);
+            if (e.equals(p.emoji)) g.setStroke(u(2.5f), 0xFF30D158);
+            rings.add(g);
             t.setBackground(g);
             t.setOnFocusChangeListener((v, has) -> v.animate().scaleX(has ? 1.2f : 1f).scaleY(has ? 1.2f : 1f).setDuration(160).start());
             t.setOnClickListener(v -> {
                 p.emoji = e;
                 Profiles.update(this, p);
-                show(index, 0);
+                for (GradientDrawable r : rings) r.setStroke(0, 0);
+                g.setStroke(u(2.5f), 0xFF30D158);
             });
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(u(46), u(46));
             lp.leftMargin = lp.rightMargin = u(5);
-            row.addView(t, lp);
+            avatars.addView(t, lp);
         }
         LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         rlp.topMargin = u(6);
-        rlp.bottomMargin = u(14);
-        page.addView(row, rlp);
-        LinearLayout l2 = list();
-        option(l2, "Continue", null, false, this::next);
+        page.addView(avatars, rlp);
+        buttons("Continue", this::next);
         dots();
     }
 
-    /** Backgrounds preview live behind the page as you move through them. */
+    /** Backgrounds preview live behind the page as you move through them; OK picks one. */
     void look() {
-        title("Choose a look");
-        subtitle("The background behind your apps. Move through the list to preview it.");
-        String cur = Profiles.homePrefs(this).getString("wallpaper", "aurora");
-        setBackdrop(cur);
+        title("Choose a Look");
+        subtitle("The background behind your apps. Move through the list to preview, press OK to pick.");
+        String[] cur = {Profiles.homePrefs(this).getString("wallpaper", "aurora")};
+        setBackdrop(cur[0]);
         LinearLayout l = list();
+        List<Row> group = new ArrayList<>();
         for (int i = 0; i < MainActivity.WALL_KEYS.length; i++) {
             String key = MainActivity.WALL_KEYS[i];
-            View r = option(l, MainActivity.WALL_NAMES[i], null, key.equals(cur), () -> {
+            Row[] self = new Row[1];
+            self[0] = row(l, MainActivity.WALL_NAMES[i], null, RADIO, key.equals(cur[0]), () -> {
                 Profiles.homePrefs(this).edit().putString("wallpaper", key).apply();
-                next();
+                cur[0] = key;
+                select(group, self[0]);
             });
-            View.OnFocusChangeListener base = r.getOnFocusChangeListener();
-            r.setOnFocusChangeListener((v, has) -> {
+            group.add(self[0]);
+            View.OnFocusChangeListener base = self[0].view.getOnFocusChangeListener();
+            self[0].view.setOnFocusChangeListener((v, has) -> {
                 base.onFocusChange(v, has);
                 if (has) setBackdrop(key);
             });
-            if (key.equals(cur)) r.requestFocus();
         }
+        buttonsFocus = () -> setBackdrop(cur[0]);  // leaving the list: show what was picked
+        buttons("Continue", this::next);
         dots();
     }
 
-    /** This profile's Home Screen: recommendations and/or news on the top shelf, as two switches. */
+    /** This profile's Home Screen: what the carousel shows, as switches. */
     void homeContent() {
         backdrop.animate().alpha(0.5f).setDuration(300).start();
         title("Your Home Screen");
-        subtitle("What appears at the top of Home, behind your apps. Choose any, all or none.");
-        boolean recs = Suggestions.showRecs(this), news = Suggestions.showNews(this);
+        subtitle("What plays in the carousel at the top of Home. Turn on any, all or none; you can change this in Settings.");
         LinearLayout l = list();
-        option(l, "Recommendations", "Popular movies and series on your streaming services", recs, () -> {
-            Suggestions.setShelf(this, !recs, news);
-            show(index, 0);
-            focusRow(0);
+        boolean[] recs = {Suggestions.showRecs(this)}, news = {Suggestions.showNews(this)};
+        Row[] r = new Row[1];
+        r[0] = row(l, "Recommendations", "Popular movies and series on your streaming services", SWITCH, recs[0], () -> {
+            recs[0] = !recs[0];
+            Suggestions.setShelf(this, recs[0], news[0]);
+            r[0].set(recs[0]);
         });
-        option(l, "News", "India, your city and the world, from Indian newsrooms", news, () -> {
-            Suggestions.setShelf(this, recs, !news);
-            show(index, 0);
-            focusRow(1);
+        Row[] n = new Row[1];
+        n[0] = row(l, "News", "India, your city and the world, from Indian newsrooms", SWITCH, news[0], () -> {
+            news[0] = !news[0];
+            Suggestions.setShelf(this, recs[0], news[0]);
+            n[0].set(news[0]);
         });
-        boolean cw = Profiles.homePrefs(this).getBoolean("cw_enabled", true);
-        option(l, "Continue Watching", "What you were watching, mixed into the carousel", cw, () -> {
-            Profiles.homePrefs(this).edit().putBoolean("cw_enabled", !cw).apply();
-            show(index, 0);
-            focusRow(2);
-        });
-        option(l, "Continue", recs || news || cw ? null : "Just your background for now", false, this::next);
+        // Continue Watching and apps' rows read the TV's Watch Next and channel lists (Android TV 8+):
+        // turning one on asks for that access right here.
+        boolean tv = WatchNext.supported();
+        Row cw = tvRow(l, "Continue Watching", "Pick up shows and movies where you left off", "cw_enabled", tv);
+        Row apps = tvRow(l, "From Your Apps", "Rows your apps publish, like YouTube’s", "app_rows", tv);
+        if (!tv) {
+            cw.detail("Needs Android TV 8 or later");
+            apps.detail("Needs Android TV 8 or later");
+        }
+        buttons("Continue", this::next);
         dots();
     }
 
-    /** After re-building a page, put focus back on the row that was pressed. */
-    void focusRow(int i) {
-        View v = page.findViewWithTag("list");
-        if (v instanceof LinearLayout && i < ((LinearLayout) v).getChildCount()) ((LinearLayout) v).getChildAt(i).requestFocus();
+    /** A switch for a feature that needs the TV-listings permission; asks for it when turned on. */
+    Row tvRow(LinearLayout l, String label, String detail, String key, boolean supported) {
+        android.content.SharedPreferences hp = Profiles.homePrefs(this);
+        boolean on = supported && hp.getBoolean(key, true);
+        boolean needs = on && !Perms.hasTvListings(this);
+        Row[] r = new Row[1];
+        r[0] = row(l, label, needs ? "Needs your OK — press OK to allow" : detail, SWITCH, on && !needs, () -> {
+            if (!supported) {
+                android.widget.Toast.makeText(this, label + " needs Android TV 8 or later.", android.widget.Toast.LENGTH_LONG).show();
+                return;
+            }
+            if (!Perms.hasTvListings(this)) {
+                hp.edit().putBoolean(key, true).apply();
+                Perms.requestTvListings(this);  // the page redraws with the answer
+                return;
+            }
+            boolean v = !hp.getBoolean(key, true);
+            hp.edit().putBoolean(key, v).apply();
+            r[0].set(v);
+        });
+        return r[0];
     }
 
     void weather() {
@@ -408,25 +588,35 @@ public class SetupActivity extends Activity {
         subtitle("A small weather card in the top-left corner of Home, with a 5-day forecast.");
         LinearLayout l = list();
         String city = Weather.place(this);
-        option(l, "Use My Location", city.isEmpty() ? "Found from your internet connection" : "Looks like " + city,
-                Weather.enabled(this) && !Weather.manual(this), () -> {
+        boolean on = Weather.enabled(this), manual = Weather.manual(this);
+        List<Row> group = new ArrayList<>();
+        Row[] auto = new Row[1], pick = new Row[1], off = new Row[1];
+        auto[0] = row(l, "Use My Location", city.isEmpty() || manual ? "Found from your internet connection" : "Looks like " + city,
+                RADIO, on && !manual, () -> {
                     Weather.prefs(this).edit().putBoolean(Weather.K_ENABLED, true).apply();
                     Weather.setPlace(this, null);
-                    next();
+                    select(group, auto[0]);
                 });
-        option(l, "Choose a City\u2026", Weather.manual(this) ? Weather.place(this) : "Search by name", Weather.manual(this), () -> {
+        pick[0] = row(l, "Choose a City…", manual ? Weather.place(this) : "Search by name (opens Settings)", RADIO, on && manual, () -> {
             Weather.prefs(this).edit().putBoolean(Weather.K_ENABLED, true).apply();
-            Intent i = new Intent(this, SettingsActivity.class).putExtra("page", SettingsActivity.WEATHER);
-            startActivity(i);
+            startActivity(new Intent(this, SettingsActivity.class).putExtra("page", SettingsActivity.WEATHER));
         });
-        option(l, "Don't Show Weather", null, !Weather.enabled(this), () -> {
+        off[0] = row(l, "Don’t Show Weather", null, RADIO, !on, () -> {
             Weather.prefs(this).edit().putBoolean(Weather.K_ENABLED, false).apply();
             Weather.changed(this);
-            next();
+            select(group, off[0]);
         });
-        if (city.isEmpty()) Weather.refresh(this, true, () -> {
-            if (index == 4) show(4, 0);  // show the detected city
-        });
+        group.add(auto[0]);
+        group.add(pick[0]);
+        group.add(off[0]);
+        if (city.isEmpty()) {
+            int here = index;
+            Weather.refresh(this, true, () -> {
+                if (index == here) auto[0].detail(Weather.place(this).isEmpty() ? "Found from your internet connection"
+                        : "Looks like " + Weather.place(this));
+            });
+        }
+        buttons("Continue", this::next);
         dots();
     }
 
@@ -442,65 +632,61 @@ public class SetupActivity extends Activity {
         ilp.bottomMargin = u(10);
         page.addView(icon, ilp);
         title("Presentation");
-        subtitle("Images, videos and webpages sent from any phone or computer on the same Wi-Fi. For everyone on this TV.");
+        subtitle("Show images, videos and webpages sent from any phone or computer on the same Wi-Fi. Most homes can leave this off.");
         boolean on = com.petrobot.hume.present.Presenter.enabled(this);
         LinearLayout l = list();
-        option(l, "Use Presentation", on ? "Adds a Presentation card to Home" : "Off", on, () -> {
+        row(l, "Use Presentation", on ? "Adds a Presentation card to Home" : "For shops, offices and signage", SWITCH, on, () -> {
             com.petrobot.hume.present.Presenter.set(this, com.petrobot.hume.present.Presenter.KEY_ENABLED, !on);
-            show(index, 0);
-            focusRow(0);
+            show(index, 0);  // its options appear or go
         });
         if (on) {
-            boolean boot = com.petrobot.hume.present.Presenter.startOnBoot(this),
-                    awake = com.petrobot.hume.present.Presenter.keepAwake(this);
-            option(l, "Start with the TV", "Play as soon as the TV turns on (signage)", boot, () -> {
-                com.petrobot.hume.present.Presenter.set(this, com.petrobot.hume.present.Presenter.KEY_BOOT, !boot);
-                show(index, 0);
-                focusRow(1);
+            boolean[] boot = {com.petrobot.hume.present.Presenter.startOnBoot(this)},
+                    awake = {com.petrobot.hume.present.Presenter.keepAwake(this)};
+            Row[] b = new Row[1], a = new Row[1];
+            b[0] = row(l, "Start with the TV", "Play as soon as the TV turns on", SWITCH, boot[0], () -> {
+                boot[0] = !boot[0];
+                com.petrobot.hume.present.Presenter.set(this, com.petrobot.hume.present.Presenter.KEY_BOOT, boot[0]);
+                b[0].set(boot[0]);
             });
-            option(l, "Keep Screen Awake", "No screensaver or sleep while presenting", awake, () -> {
-                com.petrobot.hume.present.Presenter.set(this, com.petrobot.hume.present.Presenter.KEY_AWAKE, !awake);
-                show(index, 0);
-                focusRow(2);
+            a[0] = row(l, "Keep Screen Awake", "No screensaver or sleep while presenting", SWITCH, awake[0], () -> {
+                awake[0] = !awake[0];
+                com.petrobot.hume.present.Presenter.set(this, com.petrobot.hume.present.Presenter.KEY_AWAKE, awake[0]);
+                a[0].set(awake[0]);
             });
         }
-        option(l, "Continue", null, false, this::next);
+        buttons("Continue", this::next);
         dots();
     }
 
-    boolean askedLocation;
-
+    /**
+     * Last page: what Hume still needs, each with its state on the right. Nothing is asked for
+     * until its row is pressed; everything here can be skipped and allowed later in Settings.
+     */
     void homeAndPermissions() {
-        // Ask right away: Android's own prompt for location (the Wi-Fi name in Control Center).
-        if (!Perms.hasLocation(this) && !askedLocation) {
-            askedLocation = true;
-            handler.postDelayed(() -> Perms.requestLocation(this), 600);
-        }
         title("Finish Setting Up");
-        subtitle("Hume works best as the home screen. Allow these once; anything this TV doesn't support is skipped.");
+        subtitle("Press a row to allow it. Only the first one matters for most people; the rest can wait.");
         LinearLayout l = list();
         boolean home = Perms.isDefaultHome(this) || PowerService.HomeButton.active(this);
-        option(l, "Make Hume the Home Screen", home ? "The Home button opens Hume" : "Choose Hume when asked", home,
-                () -> Perms.requestDefaultHome(this));
-        if (!Perms.hasLocation(this)) {
-            option(l, "Show the Wi-Fi Name", "In Control Center (needs location access)", false,
-                    () -> Perms.requestLocation(this));
-        }
-        // Continue Watching reads apps' Watch Next lists: Android TV 8+ (READ_TV_LISTINGS arrived
-        // with them in 8.0). Older TVs are told plainly.
-        if (WatchNext.supported()) {
-            boolean on = Perms.hasTvListings(this);
-            option(l, "Continue Watching", on ? "Shows and movies from your apps, where you left off"
-                    : "Read your apps\u2019 Watch Next lists (Android TV 8 and later)", on,
+        Row h = row(l, "Make Hume the Home Screen", home ? "The Home button opens Hume"
+                : "So the Home button opens Hume", ACTION, false, () -> Perms.requestDefaultHome(this));
+        h.status(home ? "✓ Done" : "Set Up  ›", home);
+        boolean cw = Profiles.homePrefs(this).getBoolean("cw_enabled", true), apps = Profiles.homePrefs(this).getBoolean("app_rows", true);
+        if (WatchNext.supported() && (cw || apps)) {
+            boolean ok = Perms.hasTvListings(this);
+            Row r = row(l, "Continue Watching & Your Apps", "Read the lists your apps publish for Home", ACTION, false,
                     () -> Perms.requestTvListings(this));
-        } else {
-            option(l, "Continue Watching", "Not supported on this TV (needs Android TV 8 or later)", false,
-                    () -> Perms.requestTvListings(this));
+            r.status(ok ? "✓ Allowed" : "Allow  ›", ok);
         }
-        if (Perms.adminSupported(this) && !Perms.hasAdmin(this)) {
-            option(l, "Power Off & Sleep Timer", "Let Hume turn the screen off", false, () -> Perms.requestAdmin(this));
+        if (Perms.adminSupported(this)) {
+            boolean ok = Perms.hasAdmin(this);
+            Row r = row(l, "Power Off & Sleep Timer", "Let Hume turn the screen off", ACTION, false, () -> Perms.requestAdmin(this));
+            r.status(ok ? "✓ Allowed" : "Allow  ›", ok);
         }
-        option(l, "Continue", null, false, this::next);
+        boolean wifi = Perms.hasLocation(this);
+        Row w = row(l, "Wi-Fi Name in Control Center", "Android counts this as location access", ACTION, false,
+                () -> Perms.requestLocation(this));
+        w.status(wifi ? "✓ Allowed" : "Allow  ›", wifi);
+        buttons("Continue", this::next);
         dots();
     }
 
@@ -529,10 +715,9 @@ public class SetupActivity extends Activity {
         LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(u(64), u(64));
         clp.bottomMargin = u(18);
         page.addView(check, clp);
-        title("You're All Set");
+        title("You\u2019re All Set");
         subtitle("Change any of this later in Settings, from the gear in Control Center.");
-        LinearLayout l = list();
-        option(l, "Go to Home Screen", null, false, () -> {
+        buttons("Go to Home Screen", () -> {
             getSharedPreferences("setup", MODE_PRIVATE).edit().putBoolean(K_DONE, true).apply();
             startActivity(new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP));
             finish();

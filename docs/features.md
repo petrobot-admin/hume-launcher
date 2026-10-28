@@ -12,17 +12,24 @@ Everything Hume Launcher does, by area. For how the code is organised see
 
 ## First-time setup
 
-The first time Hume opens it walks through Apple-style pages, one question each (OK moves on, Back
-goes back):
+The first time Hume opens it walks through Apple-style pages, one question each. Choices sit in a
+list; moving on is always a separate pill button under it (**Back** · **Continue**), so picking an
+option never skips a page. Each row shows what kind it is: an **On/Off switch**, a **radio dot**
+(one of a list), or an **action** with its state on the right (*Allow ›*, *✓ Allowed*, *✓ Done*).
+Choices change in place, and the remote's Back key also goes back.
 
 1. **Welcome**, fading through Indian and world languages, then *Get Started*.
-2. **Create Your Profile**: a name and an emoji avatar.
-3. **Choose a look**: the background, previewed live behind the page.
-4. **Your Home Screen** (this profile): Recommendations, News and Continue Watching on/off.
-5. **Weather**: use my location (shows the detected city), choose a city, or don't show weather.
-6. **Presentation** (whole TV): use Presentation; if on, *Start with the TV* and *Keep Screen Awake*.
-7. **Finish Setting Up**: Android's location prompt appears at once; make Hume the home screen and
-   allow whatever else the TV supports (each ticks when done; unsupported ones are left out).
+2. **Create Your Profile**: name (shown on the row; OK edits it) and an emoji avatar (ringed when chosen).
+3. **Choose a Look**: backgrounds previewed live as you move; OK picks one (radio).
+4. **Your Home Screen** (this profile): switches for Recommendations, News, Continue Watching and
+   From Your Apps. The last two need the TV-listings permission: turning one on asks right there
+   (on Android 7 they say *Needs Android TV 8 or later*).
+5. **Weather**: use my location (shows the detected city), choose a city (opens Settings, comes
+   back selected), or don't show weather.
+6. **Presentation** (whole TV): off for most homes; if on, *Start with the TV* and *Keep Screen Awake*.
+7. **Finish Setting Up**: Home Screen, Continue Watching & Your Apps, Power Off, Wi-Fi name — each
+   with its state; nothing is asked until its row is pressed. On TVs without a home-app chooser
+   (Google TV), *Set Up* turns on Hume's switch for the Home button.
 8. **You're All Set** → Home.
 
 Settings → Home → **Run setup again** repeats it. If Home is pressed mid-way, setup resumes.
