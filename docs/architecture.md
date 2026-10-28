@@ -18,7 +18,8 @@ source (Nayuki, MIT) under `src/io/nayuki/qrcodegen`.
 | `Suggestions.java` | JustWatch / TMDB / Stremio (Cinemeta) recommendations: fetch, cache, artwork, deep links |
 | `Search.java` | Search data: JustWatch title search (every service in India) and Cinemeta, matching each service to its installed app, Open / Get, recent searches |
 | `SearchPanel.java` | The search screen: one-row keyboard (English, digits, Hindi, voice), Apps & Settings and Movies & TV rows, the How to Watch sheet |
-| `MediaWatchService.java` | Notification listener → media sessions → Continue Watching store; DND access |
+| `WatchNext.java` | Continue Watching: apps' Watch Next rows (TV provider) merged with the media-session store; ranking, Resume links, Remove |
+| `MediaWatchService.java` | Notification listener → media sessions → Continue Watching store (fallback); DND access |
 | `Profiles.java` | Profiles (max 3), unique emoji avatars, per-profile storage names |
 | `SleepReceiver.java` | Sleep via device admin (or PowerService); sleep timer alarm |
 | `Inputs.java` | TV inputs from the TV input framework; switching via the passthrough channel URI |
@@ -48,9 +49,15 @@ source (Nayuki, MIT) under `src/io/nayuki/qrcodegen`.
   wallpaper or the carousel artwork), so it bakes a small blurred, saturation-boosted copy once per
   background and the GPU draws glass as shader-filled rounded rectangles aligned to the surface's
   screen position, plus magnified edge bands (lensing) and a gradient specular rim.
-- **Recommendations without system access.** Android's preview/Watch Next rows need a
-  system-signature permission (verified: 0 rows readable), so the top shelf uses JustWatch/TMDB
-  and Continue Watching uses published media sessions.
+- **Recommendations without system access.** The top shelf uses JustWatch/TMDB/Stremio.
+- **Continue Watching without system access.** `ACCESS_ALL_EPG_DATA` is signature-only, but the TV
+  provider also returns other apps' *searchable* rows (the default) to holders of
+  `READ_TV_LISTINGS`, a dangerous (runtime) permission. So Watch Next is read directly: the
+  provider refuses a `selection` from other apps, so filtering (browsable, type, 95% / 2 min
+  done, 60-day age, one per show) happens in `WatchNext`. Rows can't be deleted by another app,
+  so Remove keeps a per-profile hidden set keyed on package, row id and engagement time — a row
+  returns once it's watched again. Media sessions remain the fallback for apps without a list
+  (and are what Android blocks on low-RAM TVs).
 
 - **Search without a list of services.** JustWatch says which services in India have a title and
   gives each one's links; Hume finds the app for each service itself (the package in the Android

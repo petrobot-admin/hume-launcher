@@ -237,8 +237,8 @@ public class SettingsActivity extends Activity {
         nav(PRESENT, () -> com.petrobot.hume.present.Presenter.enabled(this) ? "On" : "Off");
         if (!Inputs.list(this).isEmpty()) nav(INPUTS, () -> Inputs.showCard(this) ? "On" : "Off");
         nav(WEATHER, () -> !Weather.enabled(this) ? "Off" : Weather.place(this).isEmpty() ? "On" : Weather.place(this));
-        nav(WATCHING, () -> !Profiles.homePrefs(this).getBoolean("cw_enabled", true) ? "Off" : MediaWatchService.granted(this) ? "On"
-                : Perms.listenerSupported(this) ? "Needs permission" : "Not on this TV");
+        nav(WATCHING, () -> !Profiles.homePrefs(this).getBoolean("cw_enabled", true) ? "Off" : Perms.hasContinueWatching(this) ? "On"
+                : Perms.continueWatchingSupported(this) ? "Needs permission" : "Not on this TV");
         nav(HOME, () -> {
             String k = Profiles.homePrefs(this).getString("wallpaper", "aurora");
             int i = java.util.Arrays.asList(MainActivity.WALL_KEYS).indexOf(k);
@@ -246,6 +246,7 @@ public class SettingsActivity extends Activity {
         });
         nav(PERMS, () -> {
             int missing = (Perms.hasListener(this) || !Perms.listenerSupported(this) ? 0 : 1) + (Perms.hasLocation(this) ? 0 : 1)
+                    + (Perms.hasTvListings(this) || !WatchNext.supported() ? 0 : 1)
                     + (Perms.hasAdmin(this) || !Perms.adminSupported(this) ? 0 : 1) + (Perms.isDefaultHome(this) ? 0 : 1);
             return missing == 0 ? "All allowed" : missing + " to allow";
         });
@@ -457,10 +458,13 @@ public class SettingsActivity extends Activity {
             Profiles.homePrefs(this).edit().putBoolean("cw_enabled", on).apply();
             if (!on) Toast.makeText(this, "Continue Watching titles won\u2019t appear in the carousel", Toast.LENGTH_SHORT).show();
         });
-        row("Access", () -> MediaWatchService.granted(this) ? "Allowed"
+        row("Apps\u2019 Watch Next lists", () -> Perms.hasTvListings(this) ? "Allowed"
+                : WatchNext.supported() ? "Allow\u2026" : "Not on this TV", () -> Perms.requestTvListings(this));
+        row("What\u2019s playing", () -> MediaWatchService.granted(this) ? "Allowed"
                 : Perms.listenerSupported(this) ? "Allow\u2026" : "Not on this TV", () -> Perms.requestListener(this));
         row("Clear history", () -> "", () -> {
             MediaWatchService.Store.clear(this);
+            WatchNext.dismissAll(this);
             Toast.makeText(this, "Continue Watching cleared", Toast.LENGTH_SHORT).show();
         });
     }
@@ -532,6 +536,8 @@ public class SettingsActivity extends Activity {
     }
 
     void pagePermissions() {
+        row("Continue Watching (apps\u2019 Watch Next)", () -> Perms.hasTvListings(this) ? "Allowed"
+                : WatchNext.supported() ? "Allow\u2026" : "Not on this TV", () -> Perms.requestTvListings(this));
         row("Continue Watching & Do Not Disturb", () -> Perms.hasListener(this) ? "Allowed"
                 : Perms.listenerSupported(this) ? "Allow\u2026" : "Not on this TV",
                 () -> Perms.requestListener(this));

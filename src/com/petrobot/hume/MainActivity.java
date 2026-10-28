@@ -138,8 +138,8 @@ public class MainActivity extends Activity {
     LinearLayout heroInfo, heroDots;
     ImageView heroLogo;
     TextView heroTitle, heroMeta, heroOverview, heroRemove;
-    GradientDrawable heroRemoveBg;
-    boolean removeSelected;
+    /** OK is being held on a Continue Watching card: its options opened, so the release doesn't Resume. */
+    boolean heroHeld;
     /** tvOS-style capsule button: glass when idle, solid white with dark text when focused. */
     LinearLayout heroButton;
     TextView heroBtnText;
@@ -1414,20 +1414,18 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams iclp = new LinearLayout.LayoutParams(dp(22), dp(22));
         iclp.leftMargin = dp(9);
         heroButton.addView(heroBtnIcon, iclp);
-        // Resume / Open capsule, plus a Remove capsule on Continue Watching items (Right reaches it).
+        // Resume / Open capsule, plus a "Hold OK" hint on Continue Watching items (Left/Right keep
+        // browsing the carousel; holding OK or Menu offers Resume / Remove).
         LinearLayout btnRow = new LinearLayout(this);
         btnRow.setOrientation(LinearLayout.HORIZONTAL);
         btnRow.setClipChildren(false);
         btnRow.addView(heroButton, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(32)));
         heroRemove = text(13, Ui.font(this, "semibold"), 1f);
         heroRemove.setShadowLayer(0, 0, 0, 0);
-        heroRemove.setText("\u2715  Remove");
+        heroRemove.setText("Hold OK to remove");
+        heroRemove.setAlpha(0.7f);
         heroRemove.setGravity(Gravity.CENTER);
-        heroRemove.setPadding(dp(16), 0, dp(18), 0);
-        heroRemoveBg = new GradientDrawable();
-        heroRemoveBg.setCornerRadius(dp(16));
-        heroRemoveBg.setColor(0x47FFFFFF);
-        heroRemove.setBackground(heroRemoveBg);
+        heroRemove.setPadding(dp(4), 0, dp(4), 0);
         heroRemove.setVisibility(View.GONE);
         LinearLayout.LayoutParams rlp2 = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(32));
         rlp2.leftMargin = dp(10);
@@ -1690,7 +1688,7 @@ public class MainActivity extends Activity {
         boolean reconfigured = v != heroVersion;
         heroVersion = v;
         io.execute(() -> {
-            List<Suggestions.Item> cwItems = cw ? MediaWatchService.Store.list(this) : new ArrayList<>();
+            List<Suggestions.Item> cwItems = cw ? WatchNext.all(this) : new ArrayList<>();
             StringBuilder sig = new StringBuilder();
             for (Suggestions.Item it : cwItems) sig.append(it.key).append(it.progress).append(';');
             boolean cwChanged = !sig.toString().equals(lastCwSig);
@@ -1728,10 +1726,10 @@ public class MainActivity extends Activity {
     void updateEmpty() {
         boolean show = continueMode() && heroItems.isEmpty() && !folderMode;
         if (show) {
-            shelfEmpty.setText(MediaWatchService.granted(this)
+            shelfEmpty.setText(Perms.hasContinueWatching(this)
                     ? "Shows and movies you play will appear here."
-                    : !Perms.listenerSupported(this)
-                    ? "Continue Watching isn't available on this TV (Android limits it on low-memory TVs)."
+                    : !Perms.continueWatchingSupported(this)
+                    ? "Continue Watching isn't available on this TV."
                     : "To see what you watch here, allow it in Settings \u2192 Permissions.");
         }
         shelfEmpty.animate().alpha(show ? 0.75f : 0f).setDuration(250).start();
@@ -1846,7 +1844,6 @@ public class MainActivity extends Activity {
     /** Title/meta/overview for an item, applied in the same frame as its artwork. */
     void applyHeroInfo(Suggestions.Item it, Bitmap logo, int dir) {
         boolean news = "news".equals(it.type);
-        if (removeSelected) selectRemove(false);
         heroRemove.setVisibility(!it.pkg.isEmpty() && shelfView.isFocused() ? View.VISIBLE : View.GONE);
         if (shelfView.isFocused()) {
             heroButton.setVisibility(news ? View.GONE : View.VISIBLE);
@@ -1871,6 +1868,7 @@ public class MainActivity extends Activity {
         if (!it.pkg.isEmpty()) {  // Continue Watching entry
             List<String> meta = new ArrayList<>();
             meta.add(appLabel(it.pkg));
+            if (!it.genres.isEmpty()) meta.add(it.genres);  // Watch Next: "Up Next" / "New"
             if (it.remainingMin > 0) meta.add(it.remainingMin >= 60
                     ? (it.remainingMin / 60) + " h " + (it.remainingMin % 60) + " min left" : it.remainingMin + " min left");
             heroMeta.setText(String.join("  \u00B7  ", meta));
@@ -2007,7 +2005,7 @@ public class MainActivity extends Activity {
             heroOverview.setVisibility(View.VISIBLE);
             heroButton.setVisibility(heroIsNews() ? View.GONE : View.VISIBLE);
             heroRemove.setVisibility(heroIsContinue() ? View.VISIBLE : View.GONE);
-            heroRemove.setAlpha(1f);
+            heroRemove.setAlpha(0.7f);
             if (continueMode() && heroStrip.getChildCount() > 0) heroStrip.setVisibility(View.VISIBLE);
             heroOverview.animate().alpha(0.85f).setDuration(400).setStartDelay(120).start();
             heroButton.animate().alpha(1f).setDuration(400).setStartDelay(120).start();
@@ -2027,7 +2025,6 @@ public class MainActivity extends Activity {
             }
             heroButton.animate().alpha(0f).setDuration(160).setStartDelay(0)
                     .withEndAction(() -> heroButton.setVisibility(View.GONE)).start();
-            if (removeSelected) selectRemove(false);
             heroRemove.setVisibility(View.GONE);
             heroStrip.setVisibility(View.GONE);
             scheduleAdvance();
@@ -2038,20 +2035,19 @@ public class MainActivity extends Activity {
         return heroIndex >= 0 && heroIndex < heroItems.size() && !heroItems.get(heroIndex).pkg.isEmpty();
     }
 
-    /** Moves the highlight between Resume and Remove (the carousel keeps focus). */
-    void selectRemove(boolean on) {
-        removeSelected = on;
-        heroBtnBg.setColor(on ? 0x47FFFFFF : 0xFFFFFFFF);
-        heroBtnText.setTextColor(on ? Color.WHITE : 0xFF111114);
-        heroRemoveBg.setColor(on ? 0xFFFFFFFF : 0x47FFFFFF);
-        heroRemove.setTextColor(on ? 0xFF111114 : Color.WHITE);
-        heroButton.animate().scaleX(on ? 1f : 1.08f).scaleY(on ? 1f : 1.08f).setDuration(180).start();
-        heroRemove.animate().scaleX(on ? 1.08f : 1f).scaleY(on ? 1.08f : 1f).setDuration(180).start();
+    /** Hold OK or Menu on a Continue Watching card: Resume / Remove. */
+    void continueMenu(Suggestions.Item it) {
+        List<String> l = new ArrayList<>();
+        List<Runnable> act = new ArrayList<>();
+        l.add("Resume");
+        act.add(() -> openHeroItem(it));
+        l.add("Remove from Continue Watching");
+        act.add(() -> removeHeroItem(it));
+        showMenu(heroButton, it.title, l, act, 1);
     }
 
     void removeHeroItem(Suggestions.Item it) {
-        MediaWatchService.Store.remove(this, it.key);
-        selectRemove(false);
+        forgetContinue(it);
         lastCwSig = "";
         heroVersion = -1;
         toast("Removed " + it.title);
@@ -2073,39 +2069,27 @@ public class MainActivity extends Activity {
         if (f == shelfView) {
             switch (k) {
                 case KeyEvent.KEYCODE_DPAD_LEFT:
-                    if (down) {
-                        if (removeSelected) selectRemove(false);
-                        else heroStep(-1, true);
-                    }
+                    if (down) heroStep(-1, true);
                     return true;
                 case KeyEvent.KEYCODE_DPAD_RIGHT:
-                    if (down) {
-                        if (!removeSelected && heroIsContinue()) selectRemove(true);
-                        else heroStep(1, true);
-                    }
+                    if (down) heroStep(1, true);
                     return true;
                 case KeyEvent.KEYCODE_DPAD_CENTER:
                 case KeyEvent.KEYCODE_ENTER:
-                    if (!down && !heroItems.isEmpty()) {
-                        if (removeSelected) removeHeroItem(heroItems.get(heroIndex));
-                        else openHeroItem(heroItems.get(heroIndex));
+                    // A press opens; held past the key-repeat delay (~0.5 s) on a Continue Watching
+                    // card it offers Resume / Remove instead. The menu takes the release, so a fresh
+                    // press clears the flag.
+                    if (down && ev.getRepeatCount() == 0) {
+                        heroHeld = false;
+                    } else if (down && ev.getRepeatCount() == 1 && heroIsContinue()) {
+                        heroHeld = true;
+                        continueMenu(heroItems.get(heroIndex));
+                    } else if (!down && !heroItems.isEmpty() && !heroHeld) {
+                        openHeroItem(heroItems.get(heroIndex));
                     }
                     return true;
                 case KeyEvent.KEYCODE_MENU:
-                    if (!down && !heroItems.isEmpty() && !heroItems.get(heroIndex).pkg.isEmpty()) {
-                        Suggestions.Item it = heroItems.get(heroIndex);
-                        List<String> l = new ArrayList<>();
-                        List<Runnable> act = new ArrayList<>();
-                        l.add("Resume");
-                        act.add(() -> openHeroItem(it));
-                        l.add("Remove from Continue Watching");
-                        act.add(() -> {
-                            MediaWatchService.Store.remove(this, it.key);
-                            heroItems = new ArrayList<>();
-                            loadHero();
-                        });
-                        showMenu(heroButton, it.title, l, act, 1);
-                    }
+                    if (!down && heroIsContinue()) continueMenu(heroItems.get(heroIndex));
                     return true;
                 case KeyEvent.KEYCODE_DPAD_UP: if (down) focusTop(); return true;
                 case KeyEvent.KEYCODE_DPAD_DOWN:
@@ -2220,9 +2204,13 @@ public class MainActivity extends Activity {
             Suggestions.open(this, it);
             return;
         }
-        Intent i = getPackageManager().getLeanbackLaunchIntentForPackage(it.pkg);
-        if (i == null) i = getPackageManager().getLaunchIntentForPackage(it.pkg);
-        if (i != null) Suggestions.start(this, i);
+        WatchNext.open(this, it);  // the title itself where the app published a link, else the app
+    }
+
+    /** Remove from Continue Watching: our own entry is deleted; an app's Watch Next row is hidden. */
+    void forgetContinue(Suggestions.Item it) {
+        if (WatchNext.isRow(it)) WatchNext.dismiss(this, it.key);
+        else MediaWatchService.Store.remove(this, it.key);
     }
 
     // ---------------------------------------------------------------- focus sway
@@ -4064,6 +4052,10 @@ public class MainActivity extends Activity {
         super.onRequestPermissionsResult(req, perms, results);
         if (req == SearchPanel.REQ_MIC && search != null) {
             search.onMicPermission(results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED);
+        }
+        if (req == Perms.REQ_TV_LISTINGS) {
+            lastCwSig = "";
+            loadHero();
         }
     }
 

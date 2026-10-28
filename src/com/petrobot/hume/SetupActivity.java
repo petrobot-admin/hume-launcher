@@ -486,8 +486,20 @@ public class SetupActivity extends Activity {
             option(l, "Show the Wi-Fi Name", "In Control Center (needs location access)", false,
                     () -> Perms.requestLocation(this));
         }
-        if (Perms.listenerSupported(this) && !Perms.hasListener(this)) {
-            option(l, "Continue Watching", "Remember what you play in each app", false, () -> Perms.requestListener(this));
+        // Apps' Watch Next lists need Android TV 8+ (READ_TV_LISTINGS arrived with them in 8.0);
+        // on Android 7 Continue Watching can only come from what plays (notification access).
+        if (WatchNext.supported()) {
+            boolean on = Perms.hasTvListings(this);
+            option(l, "Continue Watching", on ? "Shows and movies from your apps, where you left off"
+                    : "Read your apps\u2019 Watch Next lists (Android TV 8 and later)", on,
+                    () -> Perms.requestTvListings(this));
+        } else if (Perms.listenerSupported(this)) {
+            boolean on = Perms.hasListener(this);
+            option(l, "Continue Watching", on ? "Remembers what you play in each app"
+                    : "Remember what you play (apps\u2019 Watch Next lists need Android TV 8+)", on,
+                    () -> Perms.requestListener(this));
+        } else {
+            option(l, "Continue Watching", "Not on this TV: needs Android TV 8+, or more memory", false, () -> { });
         }
         if (Perms.adminSupported(this) && !Perms.hasAdmin(this)) {
             option(l, "Power Off & Sleep Timer", "Let Hume turn the screen off", false, () -> Perms.requestAdmin(this));

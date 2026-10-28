@@ -41,7 +41,8 @@ last resort for TVs that have no such screen.
 
 | Feature | Command |
 |---|---|
-| Continue Watching + Do Not Disturb | `adb shell cmd notification allow_listener com.petrobot.hume/com.petrobot.hume.MediaWatchService` |
+| Continue Watching (apps' Watch Next lists) | `adb shell pm grant com.petrobot.hume android.permission.READ_TV_LISTINGS` |
+| Continue Watching (what plays) + Do Not Disturb | `adb shell cmd notification allow_listener com.petrobot.hume/com.petrobot.hume.MediaWatchService` |
 | Power Off + Sleep Timer | `adb shell dpm set-active-admin com.petrobot.hume/.SleepReceiver\$Admin` |
 | Wi-Fi name in Control Center | `adb shell pm grant com.petrobot.hume android.permission.ACCESS_FINE_LOCATION` |
 | Search dictation (microphone) | `adb shell pm grant com.petrobot.hume android.permission.RECORD_AUDIO` — not normally needed: without it, Search uses the TV's own voice prompt |

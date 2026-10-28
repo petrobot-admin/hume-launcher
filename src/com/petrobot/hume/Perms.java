@@ -15,13 +15,15 @@ import android.provider.Settings;
  * Permissions, asked for on screen wherever the TV allows it; adb is only the last resort.
  * - Location (Wi-Fi name): the normal runtime prompt.
  * - Device admin (Power Off, Sleep Timer): Android's "Activate device admin app?" screen.
- * - Notification access (Continue Watching, Do Not Disturb): the system's notification-access
- *   screen (Android 11+ opens Hume's own switch directly).
+ * - TV listings (Continue Watching from apps' Watch Next rows): the normal runtime prompt.
+ * - Notification access (Continue Watching from what plays, Do Not Disturb): the system's
+ *   notification-access screen (Android 11+ opens Hume's own switch directly).
  * Some TVs (e.g. Android 9 builds) have no screen for the last two; only then is the
  * one-time computer command shown.
  */
 final class Perms {
     static final int REQ_LOCATION = 41;
+    static final int REQ_TV_LISTINGS = 43;
 
     private Perms() {
     }
@@ -66,6 +68,47 @@ final class Perms {
 
     static boolean hasListener(Activity a) {
         return MediaWatchService.granted(a);
+    }
+
+    // ---------------------------------------------------------------- Continue Watching
+
+    static boolean hasTvListings(Activity a) {
+        return WatchNext.granted(a);
+    }
+
+    /** Either source works; Watch Next is the one low-RAM TVs still allow. */
+    static boolean continueWatchingSupported(Activity a) {
+        return WatchNext.supported() || listenerSupported(a);
+    }
+
+    static boolean hasContinueWatching(Activity a) {
+        return hasTvListings(a) || hasListener(a);
+    }
+
+    /** Asks for whichever Continue Watching access is still missing, Watch Next first. */
+    static void requestContinueWatching(Activity a) {
+        if (WatchNext.supported() && !hasTvListings(a)) requestTvListings(a);
+        else requestListener(a);
+    }
+
+    static void requestTvListings(Activity a) {
+        if (hasTvListings(a)) return;
+        if (!WatchNext.supported()) {
+            new AlertDialog.Builder(a, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                    .setTitle("Not available on this TV")
+                    .setMessage("Apps' Watch Next lists need Android 8 or later.")
+                    .setPositiveButton("OK", null).show();
+            return;
+        }
+        android.content.SharedPreferences p = a.getSharedPreferences("perms", Activity.MODE_PRIVATE);
+        // Once refused with "Don't ask again", Android answers without showing the prompt.
+        if (p.getBoolean("asked_tv_listings", false) && !a.shouldShowRequestPermissionRationale(WatchNext.PERM)) {
+            lastResort(a, "Continue Watching",
+                    "adb shell pm grant com.petrobot.hume android.permission.READ_TV_LISTINGS");
+            return;
+        }
+        p.edit().putBoolean("asked_tv_listings", true).apply();
+        a.requestPermissions(new String[]{WatchNext.PERM}, REQ_TV_LISTINGS);
     }
 
     static void requestLocation(Activity a) {

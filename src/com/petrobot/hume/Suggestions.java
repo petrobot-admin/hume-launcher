@@ -95,6 +95,8 @@ final class Suggestions {
         String pkg = "", key = "";
         float progress = -1f;
         int remainingMin = -1;
+        /** Continue Watching: when it was last played (ms), for ordering. */
+        long played;
         double rating;
         /** News: when the story was published (ms), for "2 h ago". */
         long published;
@@ -570,6 +572,24 @@ final class Suggestions {
             while (o.outWidth / (o.inSampleSize * 2) >= maxWidth) o.inSampleSize *= 2;
             o.inJustDecodeBounds = false;
             return BitmapFactory.decodeFile(path, o);
+        }
+        if (path.startsWith("content:") || path.startsWith("android.resource:")) {  // Watch Next artwork
+            try {
+                Uri u = Uri.parse(path);
+                BitmapFactory.Options o = new BitmapFactory.Options();
+                o.inJustDecodeBounds = true;
+                try (InputStream in = c.getContentResolver().openInputStream(u)) {
+                    BitmapFactory.decodeStream(in, null, o);
+                }
+                o.inSampleSize = 1;
+                while (o.outWidth / (o.inSampleSize * 2) >= maxWidth) o.inSampleSize *= 2;
+                o.inJustDecodeBounds = false;
+                try (InputStream in = c.getContentResolver().openInputStream(u)) {
+                    return BitmapFactory.decodeStream(in, null, o);
+                }
+            } catch (Exception e) {
+                return null;
+            }
         }
         try {
             File dir = new File(c.getCacheDir(), "tmdb");

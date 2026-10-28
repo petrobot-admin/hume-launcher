@@ -20,14 +20,18 @@ import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
- * Builds the Continue Watching list. Android's own Watch Next list is reserved for system
- * launchers, so instead this listens to the media sessions apps publish while they play (title,
- * artwork, position) and remembers the latest per title. Requires notification-listener access:
+ * Continue Watching for apps that don't publish Android's Watch Next list (see WatchNext): listens
+ * to the media sessions apps publish while they play (title, artwork, position) and remembers the
+ * latest per title. Music, trailers, ads, clips and live streams are left out (see Store.worthKeeping).
+ * Requires notification-listener access, which Android withholds on low-RAM TVs:
  *   adb shell cmd notification allow_listener com.petrobot.hume/com.petrobot.hume.MediaWatchService
  */
 public class MediaWatchService extends NotificationListenerService {
@@ -73,6 +77,8 @@ public class MediaWatchService extends NotificationListenerService {
                 }
 
                 @Override public void onSessionDestroyed() {
+                    // The last position, for apps that close without pausing first.
+                    Store.record(MediaWatchService.this, mc.getPackageName(), mc.getMetadata(), mc.getPlaybackState());
                     tracked.remove(mc.getSessionToken());
                 }
             };
@@ -90,6 +96,14 @@ public class MediaWatchService extends NotificationListenerService {
     /** The Continue Watching list on disk (files/continue.json + artwork in files/cw/). */
     static final class Store {
         static final int MAX = 20;
+        /** Shorter than this is a trailer, ad, clip or short, not something to come back to. */
+        static final long MIN_DURATION_MS = 5 * 60_000;
+        /** Played less than this: sampled, not watched (also the bar for streams with no duration). */
+        static final long MIN_WATCHED_MS = 60_000, MIN_WATCHED_NO_DURATION_MS = 5 * 60_000;
+        /** Music apps publish sessions too; they belong to the apps, not Continue Watching. */
+        static final Set<String> AUDIO_APPS = new HashSet<>(Arrays.asList("com.spotify.tv.android",
+                "com.google.android.youtube.tvmusic", "com.jio.media.jiobeats", "com.gaana", "com.bsbportal.music",
+                "com.amazon.mp3", "com.apple.android.music", "com.wynk.music"));
 
         static File file(Context c) {
             return new File(c.getFilesDir(), Profiles.continueFile(Profiles.current(c).id));
@@ -132,6 +146,7 @@ public class MediaWatchService extends NotificationListenerService {
                     pos += (long) ((SystemClock.elapsedRealtime() - s.getLastPositionUpdateTime()) * s.getPlaybackSpeed());
                 }
             }
+            if (isAudioApp(c, pkg) || s != null && s.getState() == PlaybackState.STATE_ERROR) return;
             String key = pkg + "|" + title;
             JSONArray old = read(c);
             JSONArray out = new JSONArray();
@@ -142,9 +157,13 @@ public class MediaWatchService extends NotificationListenerService {
                 if (key.equals(o.optString("key"))) prev = o;
                 else out.put(o);
             }
-            // Finished (last 3%): drop it from the list.
-            if (dur > 0 && pos > dur * 0.97) {
-                write(c, out);
+            // Finished (credits: the last 5% or 2 minutes): drop it from the list.
+            if (dur > 0 && (pos >= dur * 0.95 || dur >= 10 * 60_000 && dur - pos < 2 * 60_000)) {
+                if (prev != null) write(c, out);
+                return;
+            }
+            if (!worthKeeping(pos, dur)) {
+                // A short sample of something already listed keeps its entry; nothing new is added.
                 return;
             }
             try {
@@ -177,7 +196,27 @@ public class MediaWatchService extends NotificationListenerService {
             }
         }
 
-        /** Drops entries last played more than 7 days ago (and their saved artwork). */
+        /**
+         * Only feature-length or episode-length video actually watched: known duration of at least
+         * 5 minutes and a minute in, or (live or unknown duration) 5 minutes in.
+         */
+        static boolean worthKeeping(long pos, long dur) {
+            if (dur > 0) return dur >= MIN_DURATION_MS && pos >= MIN_WATCHED_MS;
+            return pos >= MIN_WATCHED_NO_DURATION_MS;
+        }
+
+        static boolean isAudioApp(Context c, String pkg) {
+            if (AUDIO_APPS.contains(pkg)) return true;
+            if (android.os.Build.VERSION.SDK_INT < 26) return false;
+            try {
+                return c.getPackageManager().getApplicationInfo(pkg, 0).category
+                        == android.content.pm.ApplicationInfo.CATEGORY_AUDIO;
+            } catch (Exception e) {
+                return false;
+            }
+        }
+
+        /** Drops entries last played more than 30 days ago (and their saved artwork). */
         static synchronized JSONArray pruneExpired(Context c) {
             JSONArray a = read(c), keep = new JSONArray();
             long now = System.currentTimeMillis();
@@ -212,7 +251,7 @@ public class MediaWatchService extends NotificationListenerService {
 
         /** Newest first, as carousel items (pkg set, progress 0..1 or -1). */
         /** Titles not played again for this long drop off Continue Watching. */
-        static final long EXPIRE_MS = 7L * 24 * 60 * 60 * 1000;
+        static final long EXPIRE_MS = 30L * 24 * 60 * 60 * 1000;
 
         static List<Suggestions.Item> list(Context c) {
             JSONArray a = pruneExpired(c);
@@ -233,6 +272,7 @@ public class MediaWatchService extends NotificationListenerService {
                 long pos = o.optLong("pos", -1), dur = o.optLong("dur", 0);
                 it.progress = dur > 0 && pos >= 0 ? Math.min(1f, pos / (float) dur) : -1f;
                 it.remainingMin = dur > 0 && pos >= 0 ? (int) Math.max(1, (dur - pos) / 60000) : -1;
+                it.played = o.optLong("ts");
                 out.add(it);
             }
             return out;

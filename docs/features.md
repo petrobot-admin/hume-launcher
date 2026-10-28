@@ -55,7 +55,7 @@ Settings → Home → **Run setup again** repeats it. If Home is pressed mid-way
 | Move mode | Arrows / OK | Move the wiggling card / finish |
 | Dock | Up | Carousel |
 | Carousel | Left / Right | Previous / next item (wraps around) |
-| Carousel (Continue Watching item) | Right | Moves from **Resume** to **Remove** |
+| Carousel (Continue Watching item) | OK / Hold OK or Menu | **Resume** / options: Resume, Remove (Left/Right keep browsing) |
 | Status row | Left / Right | Weather pill ⇄ Refresh ⇄ Search ⇄ Control Center ⇄ avatar |
 | Anywhere on Home | Hold Back for 1 second | Opens Search (a short press of Back works as before) |
 | Anywhere on Home | Search key on remotes that have one | Opens Search and starts dictation |
@@ -123,9 +123,17 @@ it, so it can't open Hume's Search.)
 
 Full-screen artwork behind the dock while a dock app is focused. One carousel holds, in order:
 
-1. **Continue Watching** (up to six): what you played recently in each app, from the "now playing"
-   information apps publish (title, artwork, position, time left). **▶ Resume** opens the app;
-   **✕ Remove** drops it. Titles not played again for **7 days** expire.
+1. **Continue Watching** (up to six): what you're in the middle of in each app, newest first.
+   - **From apps' Watch Next lists** (Netflix, Prime Video, Crunchyroll, Jellyfin, Nuvio and other
+     apps that publish one): the show, season and episode, artwork, time left, and **Up Next** /
+     **New** episodes. **▶ Resume** opens the episode itself in the app. Works on low-RAM TVs.
+   - **From what plays** (apps without a Watch Next list, where the TV allows notification access):
+     title, artwork and time left; **▶ Resume** opens the app. Music, trailers, ads, clips under
+     5 minutes and anything played for less than a minute are left out.
+   - One card per show per app, at most three per app. A title is done at 95% or with under
+     2 minutes left (the credits). **Hold OK** (or Menu) → **Remove** hides it until you watch
+     it again; Left/Right always move through the carousel. Titles not
+     played for 30 days (60 for Watch Next) drop off.
 2. **News** and **recommendations**, alternating.
 
 - **Recommendations**: popular titles in India on your services. Source **JustWatch** (no key,
@@ -250,7 +258,8 @@ Hume asks on screen wherever the TV allows it; adb is only a last resort.
 | Feature | How it is granted |
 |---|---|
 | Wi-Fi name (location) | Android's permission prompt |
-| Continue Watching & Do Not Disturb | The system notification-access screen. Not possible on low-RAM (1 GB) TVs, where Android disables it — Hume says so |
+| Continue Watching (apps' Watch Next lists) | Android's permission prompt (*TV listings*). **Android TV 8.0 and later** — Watch Next and this permission both arrived in 8.0; on Android 7 only the row below works. Setup says which applies |
+| Continue Watching (what plays) & Do Not Disturb | The system notification-access screen. Not possible on low-RAM (1 GB) TVs, where Android disables it — Hume says so |
 | Power Off & Sleep Timer | Android's "Activate device admin app?" screen; where device admin is switched off (e.g. Mi Box), Hume's accessibility switch **Hume Launcher – Power Off** in the TV's Accessibility settings (opened for you). The same switch lets Clean close apps |
 | Search dictation (microphone) | Android's permission prompt the first time the mic is used; without it, the TV's voice prompt is used |
 | Home screen | Android 10+ "default home app" prompt, the TV's Home-app settings, or Android's chooser; Hume offers this once if another launcher is home |
