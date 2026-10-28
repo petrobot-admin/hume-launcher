@@ -26,12 +26,22 @@ TV=192.168.1.13:5555
 adb connect $TV
 adb -s $TV install -r build/tvos-home.apk
 
-# Android TV keeps its own launcher in front unless it is disabled:
-adb -s $TV shell pm disable-user --user 0 com.google.android.tvlauncher
 adb -s $TV shell pm set-home-activity com.petrobot.hume/.MainActivity
 ```
 
 Press Home on the remote — Hume Launcher opens.
+
+**TVs that keep their own launcher in front (Google TV, many TCL/Sony/Philips):** no need to disable
+it. Turn on **Hume's switch** (setup offers it, or Settings → Home → *Home button opens Hume*, or
+the TV's Settings → Accessibility → *Hume Launcher*). Whenever the TV's own home screen appears,
+Hume opens instead. The stock launcher stays installed, so the TV's quick settings, account
+screens and updates keep working. The old way still works if you prefer it:
+
+```sh
+adb shell pm disable-user --user 0 com.google.android.apps.tv.launcherx   # Google TV
+adb shell pm disable-user --user 0 com.google.android.tungsten.setupwraith  # else it shows "Recovery" on Home
+adb shell pm disable-user --user 0 com.google.android.tvlauncher            # older Android TV
+```
 
 ## One-time permissions
 
@@ -41,6 +51,7 @@ last resort for TVs that have no such screen.
 
 | Feature | Command |
 |---|---|
+| Home button + Start with the TV (Hume's switch) | `adb shell settings put secure enabled_accessibility_services com.petrobot.hume/com.petrobot.hume.PowerService` then `adb shell settings put secure accessibility_enabled 1` (replaces any other enabled accessibility services) |
 | Continue Watching (apps' Watch Next lists) | `adb shell pm grant com.petrobot.hume android.permission.READ_TV_LISTINGS` |
 | Do Not Disturb | `adb shell cmd notification allow_listener com.petrobot.hume/com.petrobot.hume.MediaWatchService` |
 | Power Off + Sleep Timer | `adb shell dpm set-active-admin com.petrobot.hume/.SleepReceiver\$Admin` |

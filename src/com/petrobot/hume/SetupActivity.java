@@ -479,7 +479,7 @@ public class SetupActivity extends Activity {
         title("Finish Setting Up");
         subtitle("Hume works best as the home screen. Allow these once; anything this TV doesn't support is skipped.");
         LinearLayout l = list();
-        boolean home = Perms.isDefaultHome(this);
+        boolean home = Perms.isDefaultHome(this) || PowerService.HomeButton.active(this);
         option(l, "Make Hume the Home Screen", home ? "The Home button opens Hume" : "Choose Hume when asked", home,
                 () -> Perms.requestDefaultHome(this));
         if (!Perms.hasLocation(this)) {

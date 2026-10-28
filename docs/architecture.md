@@ -19,6 +19,10 @@ source (Nayuki, MIT) under `src/io/nayuki/qrcodegen`.
 | `Search.java` | Search data: JustWatch title search (every service in India) and Cinemeta, matching each service to its installed app, Open / Get, recent searches |
 | `SearchPanel.java` | The search screen: one-row keyboard (English, digits, Hindi, voice), Apps & Settings and Movies & TV rows, the How to Watch sheet |
 | `WatchNext.java` | Continue Watching: apps' Watch Next rows (TV provider); ranking, Resume links, Remove |
+| `AppRows.java` | Apps' own preview rows (TV provider channels and programs): one channel per app, resume channels to Continue Watching, 2-minute cache |
+| `Carousel.java` | Composes the carousel: Continue Watching, then app rows and recommendations/news 1:2, de-duplicated by title, app items rotated every 2 h |
+| `Startup.java` | Start with the TV: open an app or input at boot or on wake |
+| `PowerService.java` | Accessibility switch: Power Off fallback, Clean, Home button override (stock launcher's home window → Hume), wake trigger |
 | `MediaWatchService.java` | Notification listener for Do Not Disturb |
 | `Profiles.java` | Profiles (max 3), unique emoji avatars, per-profile storage names |
 | `SleepReceiver.java` | Sleep via device admin (or PowerService); sleep timer alarm |

@@ -42,9 +42,11 @@ Key files (full map in **[docs/architecture.md](docs/architecture.md)**):
 | `Suggestions.java`, `News.java` | Carousel content (JustWatch/TMDB/Stremio recommendations, Indian news RSS) |
 | `Search.java`, `SearchPanel.java` | Search: titles on every service with Open / Get, apps and settings; the search screen |
 | `WatchNext.java` | Continue Watching from apps' Watch Next rows |
+| `AppRows.java`, `Carousel.java` | Apps' own rows; composing the carousel from all its sources |
+| `Startup.java` | Start with the TV (app or input at boot / wake) |
 | `MediaWatchService.java` | Notification listener for Do Not Disturb |
 | `Weather*.java` | Weather data, pill and forecast panel, icons |
-| `Perms.java`, `PowerService.java` | On-screen permission flows; accessibility service for Power Off / Clean |
+| `Perms.java`, `PowerService.java` | On-screen permission flows; accessibility service for Power Off / Clean / Home button / wake |
 | `AirPlayGuard.java`, `Inputs.java`, `Clicks.java`, `Profiles.java` | AirPlay watchdog, TV inputs, sounds, profiles |
 | `Ui.java`, `Glyphs.java` | Sizing (960×540 design grid), fonts, glyphs drawn in code |
 

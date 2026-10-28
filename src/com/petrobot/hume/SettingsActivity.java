@@ -336,6 +336,24 @@ public class SettingsActivity extends Activity {
                 }).show();
             });
         }
+        section("From Your Apps");
+        row("Apps\u2019 own rows", () -> !WatchNext.supported() ? "Not on this TV"
+                : !WatchNext.granted(this) ? "Allow\u2026"
+                : Profiles.homePrefs(this).getBoolean("app_rows", true) ? "On" : "Off", () -> {
+            if (!WatchNext.granted(this)) {
+                Perms.requestTvListings(this);
+                return;
+            }
+            AppRows.setEnabled(this, !Profiles.homePrefs(this).getBoolean("app_rows", true));
+            AppRows.invalidate();
+            refreshAll();
+        });
+        if (WatchNext.granted(this) && Profiles.homePrefs(this).getBoolean("app_rows", true)) {
+            row("Apps", () -> {
+                int n = AppRows.hidden(this).size();
+                return n == 0 ? "All" : n + " hidden";
+            }, this::chooseRowApps);
+        }
         if (Suggestions.enabled(this)) {
             section("Carousel");
             row("Auto-advance", () -> {
@@ -347,6 +365,37 @@ public class SettingsActivity extends Activity {
                 Toast.makeText(this, "The carousel will refresh on Home", Toast.LENGTH_SHORT).show();
             });
         }
+    }
+
+    /** Which apps' rows the carousel uses (apps that publish rows on this TV). */
+    void chooseRowApps() {
+        new Thread(() -> {
+            List<String> pkgs = new ArrayList<>(AppRows.load(this).byApp.keySet());
+            runOnUiThread(() -> {
+                if (pkgs.isEmpty()) {
+                    Toast.makeText(this, "None of your apps publish rows on this TV yet. Open them once and check again.",
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
+                String[] names = new String[pkgs.size()];
+                boolean[] on = new boolean[names.length];
+                Set<String> hidden = AppRows.hidden(this);
+                for (int i = 0; i < names.length; i++) {
+                    try {
+                        names[i] = String.valueOf(getPackageManager().getApplicationLabel(
+                                getPackageManager().getApplicationInfo(pkgs.get(i), 0)));
+                    } catch (Exception e) {
+                        names[i] = pkgs.get(i);
+                    }
+                    on[i] = !hidden.contains(pkgs.get(i));
+                }
+                dialog("Apps in the carousel").setMultiChoiceItems(names, on, (d, w, checked) -> on[w] = checked)
+                        .setPositiveButton("Done", (d, w) -> {
+                            for (int i = 0; i < on.length; i++) AppRows.setHidden(this, pkgs.get(i), !on[i]);
+                            refreshAll();
+                        }).setNegativeButton("Cancel", null).show();
+            });
+        }).start();
     }
 
     void chooseNewsrooms() {
@@ -482,6 +531,33 @@ public class SettingsActivity extends Activity {
                 d.dismiss();
             }).show();
         });
+        row("Home button opens Hume", () -> PowerService.HomeButton.isDefaultHome(this) ? "Not needed"
+                : !PowerService.HomeButton.enabled(this) ? "Off"
+                : Perms.hasAccessibility(this) ? "On" : "Needs Hume\u2019s switch\u2026", this::toggleHomeButton);
+        section("Start with the TV");
+        row("Open", () -> Startup.label(this), this::chooseStartup);
+        if (!Startup.target(this).isEmpty()) {
+            row("When", () -> Startup.onWake(this) ? "When the TV starts or wakes" : "When the TV starts", () -> {
+                String[] names = {"When the TV starts", "When the TV starts or wakes from standby"};
+                dialog("Open it").setSingleChoiceItems(names, Startup.onWake(this) ? 1 : 0, (d, w) -> {
+                    Startup.setOnWake(this, w == 1);
+                    d.dismiss();
+                    refreshAll();
+                    if (w == 1 && !Perms.hasAccessibility(this)) {
+                        Perms.requestAccessibility(this, "Android lets Hume open an app when the TV wakes only "
+                                + "with Hume\u2019s accessibility switch on.");
+                    }
+                }).show();
+            });
+            if (Startup.onWake(this) && !Perms.hasAccessibility(this)) {
+                row("Waking into it", () -> "Needs Hume\u2019s switch\u2026", () -> Perms.requestAccessibility(this,
+                        "Android lets Hume open an app when the TV wakes only with Hume\u2019s accessibility switch on."));
+            }
+            if (com.petrobot.hume.present.Presenter.enabled(this) && com.petrobot.hume.present.Presenter.startOnBoot(this)) {
+                row("At boot", () -> "Presentation starts instead", () -> show(PRESENT));
+            }
+        }
+        section("Home Screen");
         row("Navigation sounds", () -> Clicks.enabled(this) ? "On" : "Off",
                 () -> Clicks.setEnabled(this, !Clicks.enabled(this)));
         row("Full-screen carousel when idle", () -> {
@@ -532,7 +608,48 @@ public class SettingsActivity extends Activity {
         });
     }
 
+    /** Home button override: on/off, asking for the accessibility switch when it's needed. */
+    void toggleHomeButton() {
+        if (PowerService.HomeButton.isDefaultHome(this)) {
+            Toast.makeText(this, "Hume is already the home app, so the Home button opens it.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        boolean on = PowerService.HomeButton.enabled(this);
+        if (on && !Perms.hasAccessibility(this)) {
+            Perms.requestAccessibility(this, "This TV keeps its own home screen. With Hume\u2019s switch on, Hume opens "
+                    + "whenever that home screen appears, so the Home button brings you here.");
+            return;
+        }
+        PowerService.HomeButton.setEnabled(this, !on);
+        refreshAll();
+    }
+
+    /** Start with the TV: Home Screen, a TV input, or an app. */
+    void chooseStartup() {
+        List<String> targets = new ArrayList<>(), names = new ArrayList<>();
+        targets.add("");
+        names.add("Home Screen  (default)");
+        for (Inputs.Input in : Inputs.list(this)) {
+            if (in.usb) continue;
+            targets.add("input:" + in.id);
+            names.add(in.label);
+        }
+        for (String[] app : Startup.apps(this)) {
+            targets.add("app:" + app[0]);
+            names.add(app[1]);
+        }
+        int sel = Math.max(0, targets.indexOf(Startup.target(this)));
+        dialog("When the TV turns on, open").setSingleChoiceItems(names.toArray(new String[0]), sel, (d, w) -> {
+            Startup.set(this, targets.get(w), w == 0 ? "" : names.get(w));
+            d.dismiss();
+            show(HOME);
+        }).show();
+    }
+
     void pagePermissions() {
+        row("Home button & Start with the TV", () -> Perms.hasAccessibility(this) ? "Allowed" : "Allow\u2026",
+                () -> Perms.requestAccessibility(this, "Hume\u2019s switch lets it open itself when the TV\u2019s own "
+                        + "home screen appears, and open your chosen app when the TV wakes."));
         row("Continue Watching (apps\u2019 Watch Next)", () -> Perms.hasTvListings(this) ? "Allowed"
                 : WatchNext.supported() ? "Allow\u2026" : "Not on this TV", () -> Perms.requestTvListings(this));
         row("Do Not Disturb", () -> Perms.hasListener(this) ? "Allowed"

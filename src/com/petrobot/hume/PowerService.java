@@ -1,8 +1,12 @@
 package com.petrobot.hume;
 
 import android.accessibilityservice.AccessibilityService;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
@@ -11,13 +15,19 @@ import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
- * Hume's accessibility switch, turned on by the user in the TV's Accessibility settings. It does
- * two things, both only when asked from Hume: put the TV to sleep (Power Off, Sleep Timer) on TVs
- * where device admin is switched off, and close apps for Clean by pressing Force stop on each app's
- * info page. It reads nothing else on screen.
+ * Hume's accessibility switch, turned on by the user in the TV's Accessibility settings. It:
+ * - puts the TV to sleep (Power Off, Sleep Timer) on TVs where device admin is switched off;
+ * - closes apps for Clean by pressing Force stop on each app's info page;
+ * - Home button: when the TV's own launcher comes up (Home pressed, or Back out of an app) while
+ *   Hume isn't the home app, opens Hume instead, so the stock launcher needn't be disabled. Only
+ *   the package and class of the window that opened are looked at, nothing on screen;
+ * - Start with the TV: opens the chosen app or input on wake (Android allows an accessibility
+ *   service to open screens from the background).
  */
 public class PowerService extends AccessibilityService {
     static PowerService instance;
@@ -27,14 +37,34 @@ public class PowerService extends AccessibilityService {
     private Runnable onDone;
     private int step;
 
+    private BroadcastReceiver screenOn;
+
     @Override
     protected void onServiceConnected() {
         instance = this;
+        screenOn = new BroadcastReceiver() {
+            @Override public void onReceive(Context c, Intent i) {
+                Startup.onScreenOn(c);
+            }
+        };
+        registerReceiver(screenOn, new IntentFilter(Intent.ACTION_SCREEN_ON));
+        // Bound early after boot, and allowed to open screens: a reliable boot trigger too.
+        if (com.petrobot.hume.present.Presenter.justBooted()) Startup.onBoot(this);
     }
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent e) {
+        if (e.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED || !queue.isEmpty()) return;
+        CharSequence pkg = e.getPackageName(), cls = e.getClassName();
+        if (pkg == null || cls == null || !HomeButton.wanted(this)) return;
+        if (!HomeButton.stockHomes(this).contains(pkg + "/" + cls)) return;
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (now - lastRedirect < 800) return;  // the stock launcher may report its window twice
+        lastRedirect = now;
+        startActivity(new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
     }
+
+    private long lastRedirect;
 
     @Override
     public void onInterrupt() {
@@ -42,6 +72,7 @@ public class PowerService extends AccessibilityService {
 
     @Override
     public void onDestroy() {
+        if (screenOn != null) unregisterReceiver(screenOn);
         instance = null;
         super.onDestroy();
     }
@@ -119,4 +150,58 @@ public class PowerService extends AccessibilityService {
     }
 
     private int retries;
+
+    /** Home button override (see the class comment); the switch lives in Settings → Home. */
+    static final class HomeButton {
+        private static Set<String> homes;
+        private static long homesAt;
+
+        private HomeButton() {
+        }
+
+        static boolean enabled(Context c) {
+            return c.getSharedPreferences("startup", MODE_PRIVATE).getBoolean("home_override", true);
+        }
+
+        static void setEnabled(Context c, boolean on) {
+            c.getSharedPreferences("startup", MODE_PRIVATE).edit().putBoolean("home_override", on).apply();
+        }
+
+        /** On, and needed: Hume isn't the home app Android would open. */
+        static boolean wanted(Context c) {
+            return enabled(c) && !isDefaultHome(c);
+        }
+
+        /** Active right now: wanted, and the accessibility switch is on. */
+        static boolean active(Context c) {
+            return instance != null && wanted(c);
+        }
+
+        static boolean isDefaultHome(Context c) {
+            Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+            ResolveInfo ri = c.getPackageManager().resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY);
+            return ri != null && ri.activityInfo != null && c.getPackageName().equals(ri.activityInfo.packageName);
+        }
+
+        /**
+         * The other launchers' home activities ("package/class"). Android's boot-time FallbackHome
+         * in Settings is left alone. Rechecked every minute (apps change).
+         */
+        static synchronized Set<String> stockHomes(Context c) {
+            long now = android.os.SystemClock.elapsedRealtime();
+            if (homes != null && now - homesAt < 60_000) return homes;
+            Set<String> s = new HashSet<>();
+            Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+            for (ResolveInfo r : c.getPackageManager().queryIntentActivities(home, 0)) {
+                String pkg = r.activityInfo.packageName;
+                if (pkg.equals(c.getPackageName()) || r.activityInfo.name.endsWith("FallbackHome")) continue;
+                s.add(pkg + "/" + r.activityInfo.name);
+                // An activity-alias reports its target class in window events.
+                if (r.activityInfo.targetActivity != null) s.add(pkg + "/" + r.activityInfo.targetActivity);
+            }
+            homes = s;
+            homesAt = now;
+            return s;
+        }
+    }
 }

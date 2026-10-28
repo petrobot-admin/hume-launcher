@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="power_service_desc">Lets Hume Launcher put the TV to sleep (Power Off, Sleep Timer) and close apps when you press Clean in Control Center. It is only used when you ask Hume to do one of these.</string>
+    <string name="power_service_desc">Lets Hume Launcher put the TV to sleep (Power Off, Sleep Timer), close apps when you press Clean in Control Center, open Hume when the Home button brings up the TV\'s own home screen, and open your chosen app or input when the TV wakes. For the Home button it only notes which app\'s screen opened. Apart from pressing Force stop for Clean, it does not read what is on screen, and it never sees what you type.</string>
 </resources>

@@ -133,7 +133,14 @@ Full-screen artwork behind the dock while a dock app is focused. One carousel ho
      2 minutes left (the credits). **Hold OK** (or Menu) → **Remove** hides it until you watch
      it again; Left/Right always move through the carousel. Titles not played for 60 days drop off.
    - Apps that don't publish a Watch Next list (or hide it from other apps) don't appear.
-2. **News** and **recommendations**, alternating.
+   Items from apps' own *Continue watching* rows (e.g. Stremio's) follow the dated ones.
+2. **From your apps**: the rows apps publish for the home screen (YouTube, Stremio, Jellyfin, …),
+   one row per app, at most two items per app and eight in all, taken in turn across apps. Which
+   items show rotates every two hours. **▶ Open** goes to the item in its app; Hold OK →
+   *Don't show <app> here*. Settings → Top Shelf → From Your Apps turns them off or picks apps.
+3. **News** and **recommendations**, alternating; after Continue Watching, one app item is
+   placed for every two of these. A title appears once (Continue Watching, then an app's row,
+   then a recommendation).
 
 - **Recommendations**: popular titles in India on your services. Source **JustWatch** (no key,
   unofficial API) or **TMDB** (free key). Each refresh picks at random from each service's top 20,
@@ -198,6 +205,22 @@ tile turns solid white.
   Emoji, Change Colour, Delete.
 - With two or more profiles, the switcher can appear when the TV wakes (Settings → Profiles).
 
+## Home button
+
+On TVs that keep their own launcher in front (Google TV and most TV brands), Hume doesn't need it
+disabled: with **Hume's switch** on (an accessibility service), Hume opens whenever the TV's own
+home screen appears, from the Home button or Back out of an app. The stock launcher's window
+may flash for a moment. Only the name of the window that opened is checked. Settings → Home →
+*Home button opens Hume* (shows *Not needed* when Hume is already the home app).
+
+## Start with the TV
+
+Settings → Home → **Start with the TV**: open an app or an input (HDMI 1, …) **when the TV starts**,
+or **when it starts or wakes from standby**, instead of Home. For the whole TV, not per profile.
+Waking into an app needs Hume's switch (Android only lets an accessibility service open screens
+from the background); at start-up Hume is on screen anyway. Presentation's own *Start on boot*
+wins at boot. When it opens something on wake, the *Who's Watching?* picker is skipped.
+
 ## Inputs
 
 Only on TVs with hardware inputs (HDMI, AV, component, tuner): an **Inputs** card starts first in the
@@ -259,7 +282,7 @@ Hume asks on screen wherever the TV allows it; adb is only a last resort.
 | Wi-Fi name (location) | Android's permission prompt |
 | Continue Watching (apps' Watch Next lists) | Android's permission prompt (*TV listings*). **Android TV 8.0 and later** — Watch Next and this permission both arrived in 8.0; on Android 7 Continue Watching isn't supported, and setup says so |
 | Do Not Disturb | The system notification-access screen. Not possible on low-RAM (1 GB) TVs, where Android disables it — Hume says so |
-| Power Off & Sleep Timer | Android's "Activate device admin app?" screen; where device admin is switched off (e.g. Mi Box), Hume's accessibility switch **Hume Launcher – Power Off** in the TV's Accessibility settings (opened for you). The same switch lets Clean close apps |
+| Power Off & Sleep Timer | Android's "Activate device admin app?" screen; where device admin is switched off (e.g. Mi Box), Hume's accessibility switch **Hume Launcher** in the TV's Accessibility settings (opened for you). The same switch lets Clean close apps, and powers the Home button override and waking into an app |
 | Search dictation (microphone) | Android's permission prompt the first time the mic is used; without it, the TV's voice prompt is used |
 | Home screen | Android 10+ "default home app" prompt, the TV's Home-app settings, or Android's chooser; Hume offers this once if another launcher is home |
 
