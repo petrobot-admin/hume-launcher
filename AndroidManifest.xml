@@ -96,11 +96,11 @@
             <meta-data android:name="android.accessibilityservice" android:resource="@xml/power_service" />
         </service>
 
-        <!-- Continue Watching: reads the media sessions apps publish while playing. -->
+        <!-- Do Not Disturb: notification access (the name is kept so earlier grants still apply). -->
         <service
             android:name=".MediaWatchService"
             android:exported="true"
-            android:label="Hume Launcher – Continue Watching"
+            android:label="Hume Launcher – Do Not Disturb"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
