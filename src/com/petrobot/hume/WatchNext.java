@@ -19,8 +19,9 @@ import java.util.Set;
 
 /**
  * Continue Watching from Android's Watch Next list (the "Play Next" row apps such as Netflix,
- * Prime Video, Crunchyroll and Jellyfin publish to the TV provider), merged with what Hume saw
- * playing (MediaWatchService). Reading other apps' rows needs READ_TV_LISTINGS, a normal runtime
+ * Prime Video, Crunchyroll and Jellyfin publish to the TV provider), its only source: on TVs
+ * without it (Android 7) Continue Watching says it isn't supported. Reading other apps' rows
+ * needs READ_TV_LISTINGS, a normal runtime
  * permission (Android's prompt, or adb shell pm grant com.petrobot.hume android.permission.READ_TV_LISTINGS);
  * the provider then returns every row its app left searchable, which is the default.
  *
@@ -54,36 +55,37 @@ final class WatchNext {
         return supported() && c.checkSelfPermission(PERM) == PackageManager.PERMISSION_GRANTED;
     }
 
-    /** Continue Watching from any source this TV allows: Watch Next, then what Hume saw playing. */
+    /** Continue Watching: Watch Next rows, at most three per app and twelve in all. */
     static List<Suggestions.Item> all(Context c) {
-        List<Suggestions.Item> wn = list(c);
-        List<Suggestions.Item> seen = MediaWatchService.Store.list(c);
-        List<Suggestions.Item> out = new ArrayList<>(wn);
-        for (Suggestions.Item s : seen) if (!covered(wn, s)) out.add(s);
-        Collections.sort(out, (a, b) -> Long.compare(b.played, a.played));
         Map<String, Integer> perApp = new HashMap<>();
-        List<Suggestions.Item> capped = new ArrayList<>();
-        for (Suggestions.Item it : out) {
+        List<Suggestions.Item> out = new ArrayList<>();
+        for (Suggestions.Item it : list(c)) {
             int n = perApp.containsKey(it.pkg) ? perApp.get(it.pkg) : 0;
             if (n >= PER_APP) continue;
             perApp.put(it.pkg, n + 1);
-            capped.add(it);
-            if (capped.size() >= MAX) break;
+            out.add(it);
+            if (out.size() >= MAX) break;
         }
-        return capped;
+        return out;
     }
 
-    /** A media-session entry the app's own Watch Next row already shows (same show in the same app). */
-    static boolean covered(List<Suggestions.Item> wn, Suggestions.Item s) {
-        String t = norm(s.title), sub = norm(s.overview);
-        if (t.isEmpty()) return false;
-        for (Suggestions.Item w : wn) {
-            if (!w.pkg.equals(s.pkg)) continue;
-            String wt = norm(w.title);
-            if (wt.isEmpty()) continue;
-            if (wt.equals(t) || wt.equals(sub) || t.startsWith(wt) || norm(w.overview).contains(t)) return true;
+    /**
+     * Removes what 7.6 and earlier saved from media sessions (files/continue*.json and the cw/
+     * artwork folder); Continue Watching now comes only from Watch Next.
+     */
+    static void deleteOldHistory(Context c) {
+        SharedPreferences p = c.getSharedPreferences("perms", Context.MODE_PRIVATE);
+        if (p.getBoolean("old_cw_deleted", false)) return;
+        java.io.File[] files = c.getFilesDir().listFiles();
+        if (files != null) {
+            for (java.io.File f : files) {
+                if (f.getName().startsWith("continue") && f.getName().endsWith(".json")) f.delete();
+            }
         }
-        return false;
+        java.io.File[] art = new java.io.File(c.getFilesDir(), "cw").listFiles();
+        if (art != null) for (java.io.File f : art) f.delete();
+        new java.io.File(c.getFilesDir(), "cw").delete();
+        p.edit().putBoolean("old_cw_deleted", true).apply();
     }
 
     static String norm(String s) {

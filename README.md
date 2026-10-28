@@ -11,7 +11,7 @@ runtime libraries; the APK is about 1 MB.
 
 - **Home**: Liquid Glass dock, 6-across app grid in Apple's measured proportions, focus lift and
   zoom-to-open, More Apps folder, five backgrounds.
-- **Carousel**: Continue Watching first (apps' Watch Next lists plus what plays; Resume opens the
+- **Carousel**: Continue Watching first (apps' Watch Next lists, Android TV 8+; Resume opens the
   episode), then Indian news
   (India, your city, world) and rotating recommendations from your streaming services. Goes full
   screen when Home is idle.

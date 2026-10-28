@@ -18,8 +18,8 @@ source (Nayuki, MIT) under `src/io/nayuki/qrcodegen`.
 | `Suggestions.java` | JustWatch / TMDB / Stremio (Cinemeta) recommendations: fetch, cache, artwork, deep links |
 | `Search.java` | Search data: JustWatch title search (every service in India) and Cinemeta, matching each service to its installed app, Open / Get, recent searches |
 | `SearchPanel.java` | The search screen: one-row keyboard (English, digits, Hindi, voice), Apps & Settings and Movies & TV rows, the How to Watch sheet |
-| `WatchNext.java` | Continue Watching: apps' Watch Next rows (TV provider) merged with the media-session store; ranking, Resume links, Remove |
-| `MediaWatchService.java` | Notification listener → media sessions → Continue Watching store (fallback); DND access |
+| `WatchNext.java` | Continue Watching: apps' Watch Next rows (TV provider); ranking, Resume links, Remove |
+| `MediaWatchService.java` | Notification listener for Do Not Disturb |
 | `Profiles.java` | Profiles (max 3), unique emoji avatars, per-profile storage names |
 | `SleepReceiver.java` | Sleep via device admin (or PowerService); sleep timer alarm |
 | `Inputs.java` | TV inputs from the TV input framework; switching via the passthrough channel URI |
@@ -56,8 +56,9 @@ source (Nayuki, MIT) under `src/io/nayuki/qrcodegen`.
   provider refuses a `selection` from other apps, so filtering (browsable, type, 95% / 2 min
   done, 60-day age, one per show) happens in `WatchNext`. Rows can't be deleted by another app,
   so Remove keeps a per-profile hidden set keyed on package, row id and engagement time — a row
-  returns once it's watched again. Media sessions remain the fallback for apps without a list
-  (and are what Android blocks on low-RAM TVs).
+  returns once it's watched again. Watch Next is the only source (Android TV 8+): 7.6's
+  media-session history caught trailers and music, couldn't open the episode, and is blocked on
+  low-RAM TVs, so it was removed (its saved files are deleted on first run).
 
 - **Search without a list of services.** JustWatch says which services in India have a title and
   gives each one's links; Hume finds the app for each service itself (the package in the Android

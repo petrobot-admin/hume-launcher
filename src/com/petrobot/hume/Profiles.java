@@ -194,7 +194,6 @@ final class Profiles {
         for (Profile p : ps) if (!p.id.equals(id)) keep.add(p);
         save(c, keep);
         c.getSharedPreferences(prefsName(id), Context.MODE_PRIVATE).edit().clear().apply();
-        new java.io.File(c.getFilesDir(), continueFile(id)).delete();
         if (current(c).id.equals(id) || store(c).getString("current", "p1").equals(id)) setCurrent(c, keep.get(0).id);
     }
 
@@ -210,9 +209,6 @@ final class Profiles {
         return id.equals("p1") ? "home" : "home_" + id;
     }
 
-    static String continueFile(String id) {
-        return id.equals("p1") ? "continue.json" : "continue_" + id + ".json";
-    }
 
     /** Layout/background preferences of the current profile. */
     static SharedPreferences homePrefs(Context c) {

@@ -237,8 +237,8 @@ public class SettingsActivity extends Activity {
         nav(PRESENT, () -> com.petrobot.hume.present.Presenter.enabled(this) ? "On" : "Off");
         if (!Inputs.list(this).isEmpty()) nav(INPUTS, () -> Inputs.showCard(this) ? "On" : "Off");
         nav(WEATHER, () -> !Weather.enabled(this) ? "Off" : Weather.place(this).isEmpty() ? "On" : Weather.place(this));
-        nav(WATCHING, () -> !Profiles.homePrefs(this).getBoolean("cw_enabled", true) ? "Off" : Perms.hasContinueWatching(this) ? "On"
-                : Perms.continueWatchingSupported(this) ? "Needs permission" : "Not on this TV");
+        nav(WATCHING, () -> !Profiles.homePrefs(this).getBoolean("cw_enabled", true) ? "Off" : Perms.hasTvListings(this) ? "On"
+                : WatchNext.supported() ? "Needs permission" : "Not on this TV");
         nav(HOME, () -> {
             String k = Profiles.homePrefs(this).getString("wallpaper", "aurora");
             int i = java.util.Arrays.asList(MainActivity.WALL_KEYS).indexOf(k);
@@ -460,10 +460,7 @@ public class SettingsActivity extends Activity {
         });
         row("Apps\u2019 Watch Next lists", () -> Perms.hasTvListings(this) ? "Allowed"
                 : WatchNext.supported() ? "Allow\u2026" : "Not on this TV", () -> Perms.requestTvListings(this));
-        row("What\u2019s playing", () -> MediaWatchService.granted(this) ? "Allowed"
-                : Perms.listenerSupported(this) ? "Allow\u2026" : "Not on this TV", () -> Perms.requestListener(this));
         row("Clear history", () -> "", () -> {
-            MediaWatchService.Store.clear(this);
             WatchNext.dismissAll(this);
             Toast.makeText(this, "Continue Watching cleared", Toast.LENGTH_SHORT).show();
         });
@@ -538,7 +535,7 @@ public class SettingsActivity extends Activity {
     void pagePermissions() {
         row("Continue Watching (apps\u2019 Watch Next)", () -> Perms.hasTvListings(this) ? "Allowed"
                 : WatchNext.supported() ? "Allow\u2026" : "Not on this TV", () -> Perms.requestTvListings(this));
-        row("Continue Watching & Do Not Disturb", () -> Perms.hasListener(this) ? "Allowed"
+        row("Do Not Disturb", () -> Perms.hasListener(this) ? "Allowed"
                 : Perms.listenerSupported(this) ? "Allow\u2026" : "Not on this TV",
                 () -> Perms.requestListener(this));
         row("Power Off & Sleep Timer", () -> Perms.hasAdmin(this) ? "Allowed"

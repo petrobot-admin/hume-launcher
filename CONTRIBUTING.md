@@ -41,8 +41,8 @@ Key files (full map in **[docs/architecture.md](docs/architecture.md)**):
 | `SetupActivity.java` | First-time setup pages |
 | `Suggestions.java`, `News.java` | Carousel content (JustWatch/TMDB/Stremio recommendations, Indian news RSS) |
 | `Search.java`, `SearchPanel.java` | Search: titles on every service with Open / Get, apps and settings; the search screen |
-| `WatchNext.java` | Continue Watching from apps' Watch Next rows, merged with media sessions |
-| `MediaWatchService.java` | Continue Watching from media sessions (fallback) |
+| `WatchNext.java` | Continue Watching from apps' Watch Next rows |
+| `MediaWatchService.java` | Notification listener for Do Not Disturb |
 | `Weather*.java` | Weather data, pill and forecast panel, icons |
 | `Perms.java`, `PowerService.java` | On-screen permission flows; accessibility service for Power Off / Clean |
 | `AirPlayGuard.java`, `Inputs.java`, `Clicks.java`, `Profiles.java` | AirPlay watchdog, TV inputs, sounds, profiles |

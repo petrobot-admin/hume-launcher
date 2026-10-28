@@ -1688,6 +1688,7 @@ public class MainActivity extends Activity {
         boolean reconfigured = v != heroVersion;
         heroVersion = v;
         io.execute(() -> {
+            WatchNext.deleteOldHistory(this);
             List<Suggestions.Item> cwItems = cw ? WatchNext.all(this) : new ArrayList<>();
             StringBuilder sig = new StringBuilder();
             for (Suggestions.Item it : cwItems) sig.append(it.key).append(it.progress).append(';');
@@ -1726,10 +1727,10 @@ public class MainActivity extends Activity {
     void updateEmpty() {
         boolean show = continueMode() && heroItems.isEmpty() && !folderMode;
         if (show) {
-            shelfEmpty.setText(Perms.hasContinueWatching(this)
+            shelfEmpty.setText(Perms.hasTvListings(this)
                     ? "Shows and movies you play will appear here."
-                    : !Perms.continueWatchingSupported(this)
-                    ? "Continue Watching isn't available on this TV."
+                    : !WatchNext.supported()
+                    ? "Continue Watching needs Android TV 8 or later."
                     : "To see what you watch here, allow it in Settings \u2192 Permissions.");
         }
         shelfEmpty.animate().alpha(show ? 0.75f : 0f).setDuration(250).start();
@@ -2207,10 +2208,9 @@ public class MainActivity extends Activity {
         WatchNext.open(this, it);  // the title itself where the app published a link, else the app
     }
 
-    /** Remove from Continue Watching: our own entry is deleted; an app's Watch Next row is hidden. */
+    /** Remove from Continue Watching: apps' rows can't be deleted, so it is hidden until watched again. */
     void forgetContinue(Suggestions.Item it) {
-        if (WatchNext.isRow(it)) WatchNext.dismiss(this, it.key);
-        else MediaWatchService.Store.remove(this, it.key);
+        WatchNext.dismiss(this, it.key);
     }
 
     // ---------------------------------------------------------------- focus sway
