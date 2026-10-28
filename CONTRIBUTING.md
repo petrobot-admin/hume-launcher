@@ -44,6 +44,7 @@ Key files (full map in **[docs/architecture.md](docs/architecture.md)**):
 | `WatchNext.java` | Continue Watching from apps' Watch Next rows |
 | `AppRows.java`, `Carousel.java` | Apps' own rows; composing the carousel from all its sources |
 | `Startup.java` | Start with the TV (app or input at boot / wake) |
+| `Motion.java` | Motion setting; wrap every new animation's duration in `Motion.d(...)`, and check `Motion.ambient()` before starting a loop |
 | `MediaWatchService.java` | Notification listener for Do Not Disturb |
 | `Weather*.java` | Weather data, pill and forecast panel, icons |
 | `Perms.java`, `PowerService.java` | On-screen permission flows; accessibility service for Power Off / Clean / Home button / wake |

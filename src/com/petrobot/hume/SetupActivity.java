@@ -53,6 +53,7 @@ public class SetupActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         Clicks.init(this);
+        Motion.init(this);
         root = new FrameLayout(this);
         root.setBackgroundColor(0xFF000000);
         backdrop = new ImageView(this);
@@ -105,10 +106,16 @@ public class SetupActivity extends Activity {
         steps.get(index).build();
         View f = firstChoice != null ? firstChoice : primaryButton;
         if (f != null) f.requestFocus();
+        if (dir != 0) {
+            // A new page: its parts settle in one after another (title, help, choices, buttons).
+            List<View> parts = new ArrayList<>();
+            for (int k = 0; k < page.getChildCount(); k++) parts.add(page.getChildAt(k));
+            Motion.cascade(parts, u(10));
+        }
         // New page: slide and fade. Same page re-drawn (back from a system screen): a quick fade only.
         page.setAlpha(dir == 0 ? 0.6f : 0f);
-        page.setTranslationX(u(30) * dir);
-        page.animate().alpha(1f).translationX(0).setDuration(dir == 0 ? 120 : 320).start();
+        page.setTranslationX(Motion.dist(u(30)) * dir);
+        page.animate().alpha(1f).translationX(0).setDuration(Motion.d(dir == 0 ? 120 : 320)).start();
     }
 
     void next() {
@@ -235,7 +242,7 @@ public class SetupActivity extends Activity {
             int green = focused ? 0xFF1E9E48 : 0xFF30D158;
             if (kind == SWITCH) {
                 trackBg.setColor(on ? green : focused ? 0x33111114 : 0x40FFFFFF);
-                knob.animate().translationX(on ? u(14) : 0).setDuration(150).start();
+                knob.animate().translationX(on ? u(14) : 0).setDuration(Motion.d(150)).start();
             } else if (kind == RADIO) {
                 trackBg.setColor(on ? green : 0);
                 trackBg.setStroke(u(1.5f), on ? green : focused ? 0x80111114 : 0x80FFFFFF);
@@ -299,7 +306,7 @@ public class SetupActivity extends Activity {
         v.setOnFocusChangeListener((x, has) -> {
             r.focused = has;
             r.paint();
-            x.animate().scaleX(has ? 1.04f : 1f).scaleY(has ? 1.04f : 1f).setDuration(180).start();
+            x.animate().scaleX(has ? 1.04f : 1f).scaleY(has ? 1.04f : 1f).setDuration(Motion.d(180)).start();
         });
         v.setOnClickListener(x -> action.run());
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
@@ -351,7 +358,7 @@ public class SetupActivity extends Activity {
         b.setOnFocusChangeListener((v, has) -> {
             g.setColor(has ? 0xFFFFFFFF : idle);
             b.setTextColor(has ? 0xFF111114 : Color.WHITE);
-            v.animate().scaleX(has ? 1.08f : 1f).scaleY(has ? 1.08f : 1f).setDuration(180).start();
+            v.animate().scaleX(has ? 1.08f : 1f).scaleY(has ? 1.08f : 1f).setDuration(Motion.d(180)).start();
             if (has && buttonsFocus != null) buttonsFocus.run();
         });
         b.setOnClickListener(v -> go.run());
@@ -382,30 +389,30 @@ public class SetupActivity extends Activity {
     void setBackdrop(String style) {
         Bitmap b = MainActivity.makeWallpaperBase(style);
         backdrop.setImageDrawable(new BitmapDrawable(getResources(), b));
-        backdrop.animate().alpha(1f).setDuration(300).start();
+        backdrop.animate().alpha(1f).setDuration(Motion.d(300)).start();
     }
 
     // ---------------------------------------------------------------- pages
 
     /** Welcome, then Get Started. */
     void hello() {
-        backdrop.animate().alpha(0f).setDuration(300).start();
+        backdrop.animate().alpha(0f).setDuration(Motion.d(300)).start();
         View top = new View(this);
         page.addView(top, new LinearLayout.LayoutParams(1, 0, 1f));
         TextView hi = title("Welcome");
         Ui.textSize(hi, 64);
         hi.setAlpha(0f);
         hi.setTranslationY(u(12));
-        hi.animate().alpha(1f).translationY(0).setDuration(700).start();
+        hi.animate().alpha(1f).translationY(0).setDuration(Motion.d(700)).start();
         // "Welcome" in Indian and world languages, fading from one to the next.
         String[] words = {"Welcome", "स्वागत है", "স্বাগতম", "வரவேற்கிறோம்", "స్వాగతం", "स्वागत आहे", "સ્વાગત છે", "ಸ್ವಾಗತ", "സ്വാഗതം", "ਜੀ ਆਇਆਂ ਨੂੰ", "Bienvenue", "Bienvenido", "Willkommen", "ようこそ", "Benvenuto", "Bem-vindo", "欢迎"};
         int[] k = {0};
         Runnable[] cycle = new Runnable[1];
         cycle[0] = () -> {
             k[0] = (k[0] + 1) % words.length;
-            hi.animate().alpha(0f).setDuration(350).withEndAction(() -> {
+            hi.animate().alpha(0f).setDuration(Motion.d(350)).withEndAction(() -> {
                 hi.setText(words[k[0]]);
-                hi.animate().alpha(1f).setDuration(450).start();
+                hi.animate().alpha(1f).setDuration(Motion.d(450)).start();
             }).start();
             handler.postDelayed(cycle[0], 2200);
         };
@@ -482,7 +489,7 @@ public class SetupActivity extends Activity {
             if (e.equals(p.emoji)) g.setStroke(u(2.5f), 0xFF30D158);
             rings.add(g);
             t.setBackground(g);
-            t.setOnFocusChangeListener((v, has) -> v.animate().scaleX(has ? 1.2f : 1f).scaleY(has ? 1.2f : 1f).setDuration(160).start());
+            t.setOnFocusChangeListener((v, has) -> v.animate().scaleX(has ? 1.2f : 1f).scaleY(has ? 1.2f : 1f).setDuration(Motion.d(160)).start());
             t.setOnClickListener(v -> {
                 p.emoji = e;
                 Profiles.update(this, p);
@@ -530,7 +537,7 @@ public class SetupActivity extends Activity {
 
     /** This profile's Home Screen: what the carousel shows, as switches. */
     void homeContent() {
-        backdrop.animate().alpha(0.5f).setDuration(300).start();
+        backdrop.animate().alpha(0.5f).setDuration(Motion.d(300)).start();
         title("Your Home Screen");
         subtitle("What plays in the carousel at the top of Home. Turn on any, all or none; you can change this in Settings.");
         LinearLayout l = list();
@@ -691,7 +698,7 @@ public class SetupActivity extends Activity {
     }
 
     void finish_() {
-        backdrop.animate().alpha(0f).setDuration(300).start();
+        backdrop.animate().alpha(0f).setDuration(Motion.d(300)).start();
         View top = new View(this);
         page.addView(top, new LinearLayout.LayoutParams(1, 0, 1f));
         int cs = u(64);

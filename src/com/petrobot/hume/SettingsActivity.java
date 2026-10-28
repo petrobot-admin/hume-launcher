@@ -36,6 +36,7 @@ public class SettingsActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         Clicks.init(this);
+        Motion.init(this);
         String token = getIntent().getStringExtra("tmdb_token");
         if (token != null && !token.trim().isEmpty()) {
             Suggestions.prefs(this).edit().putString(Suggestions.K_TOKEN, token.trim()).apply();
@@ -116,8 +117,12 @@ public class SettingsActivity extends Activity {
         }
         if (focus != null) focus.requestFocus();
         list.setAlpha(0f);
-        list.setTranslationX(Ui.px(this, p.equals(ROOT) ? -16 : 16));
-        list.animate().alpha(1f).translationX(0).setDuration(220).start();
+        list.setTranslationX(Motion.dist(Ui.px(this, p.equals(ROOT) ? -16 : 16)));
+        list.animate().alpha(1f).translationX(0).setDuration(Motion.d(220)).start();
+        // Rows settle in one after another (tvOS Settings).
+        List<android.view.View> rows = new ArrayList<>();
+        for (int i = 0; i < list.getChildCount(); i++) rows.add(list.getChildAt(i));
+        Motion.cascade(rows, Ui.px(this, 8));
     }
 
     @Override
@@ -557,9 +562,18 @@ public class SettingsActivity extends Activity {
                 row("At boot", () -> "Presentation starts instead", () -> show(PRESENT));
             }
         }
-        section("Home Screen");
+        section("Motion & Sound");
+        row("Motion", () -> Motion.NAMES[Motion.level()], () -> {
+            String[] names = {"Full  (default)", "Reduced \u2014 shorter, no drifting or swaying", "Off \u2014 changes are instant"};
+            dialog("Motion").setSingleChoiceItems(names, Motion.level(), (d, w) -> {
+                Motion.set(this, w);
+                d.dismiss();
+                refreshAll();
+            }).show();
+        });
         row("Navigation sounds", () -> Clicks.enabled(this) ? "On" : "Off",
                 () -> Clicks.setEnabled(this, !Clicks.enabled(this)));
+        section("Home Screen");
         row("Full-screen carousel when idle", () -> {
             int sec = Profiles.homePrefs(this).getInt("idle_sec", 20);
             return sec == 0 ? "Off" : "After " + sec + " s";
@@ -766,7 +780,7 @@ public class SettingsActivity extends Activity {
             bg.setColor(has ? 0xF2FFFFFF : 0x14FFFFFF);
             l.setTextColor(has ? 0xFF111114 : Color.WHITE);
             v.setTextColor(has ? 0x99111114 : 0x99FFFFFF);
-            view.animate().withLayer().scaleX(has ? 1.03f : 1f).scaleY(has ? 1.03f : 1f).setDuration(180).start();
+            view.animate().withLayer().scaleX(has ? 1.03f : 1f).scaleY(has ? 1.03f : 1f).setDuration(Motion.d(180)).start();
         });
         r.setOnClickListener(view -> {
             action.run();
