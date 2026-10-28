@@ -128,8 +128,10 @@ Full-screen artwork behind the dock while a dock app is focused. One carousel ho
      apps that publish one): the show, season and episode, artwork, time left, and **Up Next** /
      **New** episodes. **▶ Resume** opens the episode itself in the app. Works on low-RAM TVs.
    - **From what plays** (apps without a Watch Next list, where the TV allows notification access):
-     title, artwork and time left; **▶ Resume** opens the app. Music, trailers, ads, clips under
-     5 minutes and anything played for less than a minute are left out.
+     title, artwork and time left; **▶ Resume** opens the app. Music and anything played for
+     less than a minute are left out.
+   - Nothing under **10 minutes** (trailers, clips, shorts, ads) appears from either source;
+     with no known length, it has to have played for 10 minutes.
    - One card per show per app, at most three per app. A title is done at 95% or with under
      2 minutes left (the credits). **Hold OK** (or Menu) → **Remove** hides it until you watch
      it again; Left/Right always move through the carousel. Titles not

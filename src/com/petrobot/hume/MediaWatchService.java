@@ -30,7 +30,7 @@ import java.util.Set;
 /**
  * Continue Watching for apps that don't publish Android's Watch Next list (see WatchNext): listens
  * to the media sessions apps publish while they play (title, artwork, position) and remembers the
- * latest per title. Music, trailers, ads, clips and live streams are left out (see Store.worthKeeping).
+ * latest per title. Music, trailers, ads and anything under 10 minutes are left out (see Store.worthKeeping).
  * Requires notification-listener access, which Android withholds on low-RAM TVs:
  *   adb shell cmd notification allow_listener com.petrobot.hume/com.petrobot.hume.MediaWatchService
  */
@@ -97,9 +97,10 @@ public class MediaWatchService extends NotificationListenerService {
     static final class Store {
         static final int MAX = 20;
         /** Shorter than this is a trailer, ad, clip or short, not something to come back to. */
-        static final long MIN_DURATION_MS = 5 * 60_000;
-        /** Played less than this: sampled, not watched (also the bar for streams with no duration). */
-        static final long MIN_WATCHED_MS = 60_000, MIN_WATCHED_NO_DURATION_MS = 5 * 60_000;
+        static final long MIN_DURATION_MS = WatchNext.MIN_DURATION_MS;
+        /** Played less than this: sampled, not watched. With no duration (live, some apps) the
+         *  10-minute bar applies to what was played instead. */
+        static final long MIN_WATCHED_MS = 60_000, MIN_WATCHED_NO_DURATION_MS = WatchNext.MIN_DURATION_MS;
         /** Music apps publish sessions too; they belong to the apps, not Continue Watching. */
         static final Set<String> AUDIO_APPS = new HashSet<>(Arrays.asList("com.spotify.tv.android",
                 "com.google.android.youtube.tvmusic", "com.jio.media.jiobeats", "com.gaana", "com.bsbportal.music",
@@ -158,7 +159,7 @@ public class MediaWatchService extends NotificationListenerService {
                 else out.put(o);
             }
             // Finished (credits: the last 5% or 2 minutes): drop it from the list.
-            if (dur > 0 && (pos >= dur * 0.95 || dur >= 10 * 60_000 && dur - pos < 2 * 60_000)) {
+            if (dur > 0 && (pos >= dur * 0.95 || dur - pos < 2 * 60_000)) {
                 if (prev != null) write(c, out);
                 return;
             }
@@ -197,8 +198,8 @@ public class MediaWatchService extends NotificationListenerService {
         }
 
         /**
-         * Only feature-length or episode-length video actually watched: known duration of at least
-         * 5 minutes and a minute in, or (live or unknown duration) 5 minutes in.
+         * Only episode- or feature-length video actually watched: known duration of at least
+         * 10 minutes and a minute in, or (live or unknown duration) 10 minutes in.
          */
         static boolean worthKeeping(long pos, long dur) {
             if (dur > 0) return dur >= MIN_DURATION_MS && pos >= MIN_WATCHED_MS;

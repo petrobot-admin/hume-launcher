@@ -27,7 +27,8 @@ import java.util.Set;
  * Watch Next rows come with the series title, episode, artwork, position and the app's own link
  * to the title, so Resume opens the episode rather than the app. Rules (as in the mature
  * launchers that read this list): newest engagement first; one card per show per app; at most
- * three per app and twelve in all; a CONTINUE row is done at 95% or under 2 minutes left;
+ * three per app and twelve in all; anything under 10 minutes is left out; a CONTINUE row is
+ * done at 95% or under 2 minutes left;
  * rows untouched for 60 days, non-browsable rows and Watchlist rows are left out. Apps' rows
  * can't be deleted by another app, so Remove hides a row until it is watched again.
  */
@@ -37,6 +38,8 @@ final class WatchNext {
 
     static final int TYPE_CONTINUE = 0, TYPE_NEXT = 1, TYPE_NEW = 2, TYPE_WATCHLIST = 3;
     static final long MAX_AGE_MS = 60L * 24 * 60 * 60 * 1000;
+    /** Shorter than this (trailers, clips, shorts, ads) never appears in Continue Watching. */
+    static final long MIN_DURATION_MS = 10 * 60_000;
     static final int PER_APP = 3, MAX = 12;
 
     private WatchNext() {
@@ -111,13 +114,14 @@ final class WatchNext {
                 long pos = num(cur, "last_playback_position_millis", 0), dur = num(cur, "duration_millis", 0);
                 // Some apps (e.g. Nuvio) store progress on a 100/1000/... scale instead of milliseconds.
                 boolean scale = dur == 100 || dur == 1000 || dur == 10_000 || dur == 100_000;
+                if (!scale && dur > 0 && dur < MIN_DURATION_MS) continue;
                 float progress = -1f;
                 int left = -1;
                 if (type == TYPE_CONTINUE && dur > 0 && pos > 0 && pos <= dur) {
                     progress = pos / (float) dur;
                     if (progress >= 0.95f) continue;
                     if (!scale) {
-                        if (dur >= 10 * 60_000 && dur - pos < 2 * 60_000) continue;
+                        if (dur - pos < 2 * 60_000) continue;
                         left = (int) Math.max(1, (dur - pos) / 60_000);
                     }
                 }
