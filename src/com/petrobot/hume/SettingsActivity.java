@@ -81,6 +81,7 @@ public class SettingsActivity extends Activity {
         scroller.addView(list);
         split.addView(scroller, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1.25f));
         setContentView(root);
+        Clicks.quiet(root);
         show(ROOT);
     }
 
@@ -818,11 +819,11 @@ public class SettingsActivity extends Activity {
     @Override
     public boolean dispatchKeyEvent(android.view.KeyEvent ev) {
         MainActivity.navSound(this, ev);
-        return super.dispatchKeyEvent(ev);
+        return super.dispatchKeyEvent(ev) || Clicks.moveFocus(getWindow(), ev);
     }
 
     AlertDialog.Builder dialog(String title) {
-        return new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle(title);
+        return Clicks.dialog(this).setTitle(title);
     }
 
     void refreshAll() {

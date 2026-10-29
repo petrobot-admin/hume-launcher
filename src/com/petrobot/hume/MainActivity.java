@@ -375,7 +375,7 @@ public class MainActivity extends Activity {
         if (SetupActivity.done(this) && !Perms.isDefaultHome(this) && !PowerService.HomeButton.active(this)
                 && !prefs.getBoolean("asked_default_home", false)) {
             prefs.edit().putBoolean("asked_default_home", true).apply();
-            new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            Clicks.dialog(this)
                     .setTitle("Make Hume your home screen?")
                     .setMessage("The Home button on the remote will open Hume Launcher.")
                     .setPositiveButton("Make Home Screen", (d, w) -> Perms.requestDefaultHome(this))
@@ -660,6 +660,7 @@ public class MainActivity extends Activity {
         updateWeather();
 
         setContentView(root);
+        Clicks.quiet(root);  // Android's own click sounds off: the Sounds switch decides
     }
 
     void buildGrid() {
@@ -2784,6 +2785,11 @@ public class MainActivity extends Activity {
 
     // ---------------------------------------------------------------- keys
 
+    /** Unused keys go to the views; a D-pad press nothing used moves focus here (no Android sound). */
+    boolean superDispatch(KeyEvent ev) {
+        return super.dispatchKeyEvent(ev) || Clicks.moveFocus(getWindow(), ev);
+    }
+
     @Override
     public boolean dispatchKeyEvent(KeyEvent ev) {
         if (launchOverlay != null) return true;
@@ -2807,7 +2813,7 @@ public class MainActivity extends Activity {
         resetIdle();
         if (!replayingBack) navSound(this, ev);  // a replayed Back already clicked
         if (search != null && pickerLayer == search.layer && menuLayer == null) {
-            return search.dispatch(ev) || super.dispatchKeyEvent(ev);
+            return search.dispatch(ev) || superDispatch(ev);
         }
         if (pickerLayer == null && menuLayer == null && moveIndex < 0 && keyboardSearch(ev)) return true;
         if (pickerLayer == null && menuLayer == null && moveIndex < 0 && holdBackSearch(ev)) return true;
@@ -2836,7 +2842,7 @@ public class MainActivity extends Activity {
                 if (pd) pickerMove(pk);
                 return true;
             }
-            return super.dispatchKeyEvent(ev);
+            return superDispatch(ev);
         }
         if (menuLayer != null) {
             int mk = ev.getKeyCode();
@@ -2844,7 +2850,7 @@ public class MainActivity extends Activity {
                 if (ev.getAction() == KeyEvent.ACTION_UP) closeMenu();
                 return true;
             }
-            return super.dispatchKeyEvent(ev);
+            return superDispatch(ev);
         }
         if (heroKeys(ev)) return true;
         int k = ev.getKeyCode();
@@ -2860,7 +2866,7 @@ public class MainActivity extends Activity {
                 case KeyEvent.KEYCODE_ENTER:
                 case KeyEvent.KEYCODE_BACK:
                 case KeyEvent.KEYCODE_ESCAPE:      if (down) endMove(); return true;
-                default: return super.dispatchKeyEvent(ev);
+                default: return superDispatch(ev);
             }
         }
         if (k == KeyEvent.KEYCODE_MENU) {
@@ -2877,7 +2883,7 @@ public class MainActivity extends Activity {
             }
             return true;
         }
-        return super.dispatchKeyEvent(ev);
+        return superDispatch(ev);
     }
 
     // ---------------------------------------------------------------- apps
@@ -4318,7 +4324,7 @@ public class MainActivity extends Activity {
                 items[i] = free.get(i) + "   " + Profiles.emojiName(free.get(i));
                 if (free.get(i).equals(prof.emoji)) cur = i;
             }
-            new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            Clicks.dialog(this)
                     .setTitle("Emoji")
                     .setSingleChoiceItems(items, cur, (d, w) -> {
                         prof.emoji = free.get(w);
@@ -4329,7 +4335,7 @@ public class MainActivity extends Activity {
                     }).show();
         });
         l.add("Change Colour");
-        act.add(() -> new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+        act.add(() -> Clicks.dialog(this)
                 .setTitle("Colour")
                 .setSingleChoiceItems(Profiles.COLOR_NAMES, prof.color, (d, w) -> {
                     prof.color = w;
@@ -4342,7 +4348,7 @@ public class MainActivity extends Activity {
         if (Profiles.list(this).size() > 1) {
             del = l.size();
             l.add("Delete");
-            act.add(() -> new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            act.add(() -> Clicks.dialog(this)
                     .setTitle("Delete \u201C" + prof.name + "\u201D?")
                     .setMessage("Its layout and Continue Watching list will be removed.")
                     .setPositiveButton("Delete", (d, w) -> {
@@ -4369,7 +4375,7 @@ public class MainActivity extends Activity {
         int pad = dp(14);
         box.setPadding(pad, pad / 2, pad, 0);
         box.addView(in);
-        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+        Clicks.dialog(this)
                 .setTitle(title)
                 .setView(box)
                 .setPositiveButton("Save", (d, w) -> {
