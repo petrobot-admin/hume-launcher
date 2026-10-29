@@ -237,10 +237,13 @@ public class MainActivity extends Activity {
         com.petrobot.hume.present.Presenter.ensureRunning(this);
         if (com.petrobot.hume.present.Presenter.justBooted()) {
             handler.postDelayed(() -> com.petrobot.hume.present.Presenter.openOnBootOnce(this), 1500);
+            Startup.onBoot(this);  // Start with the TV (Presentation's own boot start wins)
         }
         wakeReceiver = new BroadcastReceiver() {
             @Override public void onReceive(Context c, Intent i) {
                 AirPlayGuard.check(c, true);
+                Startup.onScreenOn(c);  // also fired by PowerService; repeats are dropped
+                if (Startup.opensOnWake(c)) return;  // going straight to an app: no "Who's watching?"
                 if (!Profiles.askOnWake(c) || Profiles.list(c).size() < 2) return;
                 if (resumed) {
                     showProfilePicker(true);
@@ -1678,24 +1681,29 @@ public class MainActivity extends Activity {
         updateEmpty();
         boolean shelf = Suggestions.enabled(this) && Suggestions.ready(this);
         boolean cw = cwEnabled();
-        if (!shelf && !cw) {
+        boolean rows = AppRows.enabled(this);
+        if (!shelf && !cw && !rows) {
             heroItems = new ArrayList<>();
             shelfView.setFocusable(false);
             setHeroShown(false);
             return;
         }
-        int v = Suggestions.version(this) * 2 + (cw ? 1 : 0);
+        int v = Suggestions.version(this) * 4 + (cw ? 1 : 0) + (rows ? 2 : 0);
         boolean reconfigured = v != heroVersion;
         heroVersion = v;
         io.execute(() -> {
             WatchNext.deleteOldHistory(this);
-            List<Suggestions.Item> cwItems = cw ? WatchNext.all(this) : new ArrayList<>();
+            AppRows.Rows appRows = cw || rows ? AppRows.load(this) : new AppRows.Rows();
+            List<Suggestions.Item> cwItems = cw
+                    ? Carousel.continueWatching(this, WatchNext.all(this), appRows.resume) : new ArrayList<>();
+            List<Suggestions.Item> appItems = rows ? Carousel.fromApps(this, appRows.byApp) : new ArrayList<>();
             StringBuilder sig = new StringBuilder();
             for (Suggestions.Item it : cwItems) sig.append(it.key).append(it.progress).append(';');
+            for (Suggestions.Item it : appItems) sig.append(it.key).append(';');
             boolean cwChanged = !sig.toString().equals(lastCwSig);
             lastCwSig = sig.toString();
             List<Suggestions.Item> base = shelf ? Suggestions.cached(this, true) : null;
-            List<Suggestions.Item> mixed = mixContinue(base, cwItems);
+            List<Suggestions.Item> mixed = Carousel.compose(cwItems, appItems, base);
             if (!mixed.isEmpty() && (reconfigured || cwChanged || heroItems.isEmpty())) {
                 handler.post(() -> setHeroItems(mixed));
             } else if (mixed.isEmpty()) {
@@ -1708,20 +1716,13 @@ public class MainActivity extends Activity {
             if (shelf && Suggestions.cached(this, false) == null) {
                 try {
                     List<Suggestions.Item> fresh = Suggestions.fetch(this);
-                    List<Suggestions.Item> m2 = mixContinue(fresh, cwItems);
+                    List<Suggestions.Item> m2 = Carousel.compose(cwItems, appItems, fresh);
                     handler.post(() -> setHeroItems(m2));
                 } catch (Exception e) {
                     android.util.Log.w("TvHome", "suggestions: " + e);
                 }
             }
         });
-    }
-
-    /** Resume first: up to six recent Continue Watching titles, then news and recommendations. */
-    static List<Suggestions.Item> mixContinue(List<Suggestions.Item> base, List<Suggestions.Item> cw) {
-        List<Suggestions.Item> out = new ArrayList<>(cw.subList(0, Math.min(6, cw.size())));
-        if (base != null) out.addAll(base);
-        return out;
     }
 
     void updateEmpty() {
@@ -1845,7 +1846,7 @@ public class MainActivity extends Activity {
     /** Title/meta/overview for an item, applied in the same frame as its artwork. */
     void applyHeroInfo(Suggestions.Item it, Bitmap logo, int dir) {
         boolean news = "news".equals(it.type);
-        heroRemove.setVisibility(!it.pkg.isEmpty() && shelfView.isFocused() ? View.VISIBLE : View.GONE);
+        heroRemove.setVisibility("continue".equals(it.type) && shelfView.isFocused() ? View.VISIBLE : View.GONE);
         if (shelfView.isFocused()) {
             heroButton.setVisibility(news ? View.GONE : View.VISIBLE);
             if (!news) heroButton.setAlpha(1f);
@@ -1866,15 +1867,16 @@ public class MainActivity extends Activity {
         heroLogo.setImageDrawable(null);
         heroLogo.setVisibility(View.GONE);
         selectStrip(heroIndex);
-        if (!it.pkg.isEmpty()) {  // Continue Watching entry
+        if (!it.pkg.isEmpty()) {  // Continue Watching, or an app's own row
+            boolean app = "app".equals(it.type);
             List<String> meta = new ArrayList<>();
             meta.add(appLabel(it.pkg));
-            if (!it.genres.isEmpty()) meta.add(it.genres);  // Watch Next: "Up Next" / "New"
+            if (!it.genres.isEmpty()) meta.add(it.genres);  // Watch Next "Up Next" / "New", or the app's row name
             if (it.remainingMin > 0) meta.add(it.remainingMin >= 60
                     ? (it.remainingMin / 60) + " h " + (it.remainingMin % 60) + " min left" : it.remainingMin + " min left");
             heroMeta.setText(String.join("  \u00B7  ", meta));
             heroOverview.setText(it.overview);
-            heroBtnText.setText("\u25B6  Resume");
+            heroBtnText.setText(app && it.progress <= 0 ? "\u25B6  Open" : "\u25B6  Resume");
             try {
                 heroProvider.setImageDrawable(getPackageManager().getApplicationIcon(it.pkg));
                 heroProvider.setVisibility(View.VISIBLE);
@@ -2033,17 +2035,39 @@ public class MainActivity extends Activity {
     }
 
     boolean heroIsContinue() {
+        return heroIndex >= 0 && heroIndex < heroItems.size() && "continue".equals(heroItems.get(heroIndex).type);
+    }
+
+    /** Continue Watching and apps' rows have options (Hold OK / Menu). */
+    boolean heroHasMenu() {
         return heroIndex >= 0 && heroIndex < heroItems.size() && !heroItems.get(heroIndex).pkg.isEmpty();
     }
 
-    /** Hold OK or Menu on a Continue Watching card: Resume / Remove. */
-    void continueMenu(Suggestions.Item it) {
+    /**
+     * Hold OK or Menu on a carousel card: Continue Watching offers Resume / Remove; an app's row
+     * offers Open / Hide this app's rows (Settings → Top Shelf turns them back on).
+     */
+    void heroMenu(Suggestions.Item it) {
         List<String> l = new ArrayList<>();
         List<Runnable> act = new ArrayList<>();
-        l.add("Resume");
-        act.add(() -> openHeroItem(it));
-        l.add("Remove from Continue Watching");
-        act.add(() -> removeHeroItem(it));
+        if ("continue".equals(it.type)) {
+            l.add("Resume");
+            act.add(() -> openHeroItem(it));
+            l.add("Remove from Continue Watching");
+            act.add(() -> removeHeroItem(it));
+        } else {
+            String app = appLabel(it.pkg);
+            l.add("Open");
+            act.add(() -> openHeroItem(it));
+            l.add("Don\u2019t show " + app + " here");
+            act.add(() -> {
+                AppRows.setHidden(this, it.pkg, true);
+                lastCwSig = "";
+                heroVersion = -1;
+                toast(app + " won\u2019t appear in the carousel");
+                loadHero();
+            });
+        }
         showMenu(heroButton, it.title, l, act, 1);
     }
 
@@ -2082,15 +2106,15 @@ public class MainActivity extends Activity {
                     // press clears the flag.
                     if (down && ev.getRepeatCount() == 0) {
                         heroHeld = false;
-                    } else if (down && ev.getRepeatCount() == 1 && heroIsContinue()) {
+                    } else if (down && ev.getRepeatCount() == 1 && heroHasMenu()) {
                         heroHeld = true;
-                        continueMenu(heroItems.get(heroIndex));
+                        heroMenu(heroItems.get(heroIndex));
                     } else if (!down && !heroItems.isEmpty() && !heroHeld) {
                         openHeroItem(heroItems.get(heroIndex));
                     }
                     return true;
                 case KeyEvent.KEYCODE_MENU:
-                    if (!down && heroIsContinue()) continueMenu(heroItems.get(heroIndex));
+                    if (!down && heroHasMenu()) heroMenu(heroItems.get(heroIndex));
                     return true;
                 case KeyEvent.KEYCODE_DPAD_UP: if (down) focusTop(); return true;
                 case KeyEvent.KEYCODE_DPAD_DOWN:
@@ -3632,6 +3656,7 @@ public class MainActivity extends Activity {
         refreshButton.setRotation(0);
         refreshButton.animate().rotation(360).setDuration(700).setInterpolator(EASE).start();
         Suggestions.changed(this);
+        AppRows.invalidate();
         lastCwSig = "";
         heroVersion = -1;
         heroItems = new ArrayList<>();
@@ -4054,7 +4079,9 @@ public class MainActivity extends Activity {
             search.onMicPermission(results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED);
         }
         if (req == Perms.REQ_TV_LISTINGS) {
+            AppRows.invalidate();
             lastCwSig = "";
+            heroVersion = -1;
             loadHero();
         }
     }

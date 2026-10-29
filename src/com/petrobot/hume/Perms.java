@@ -96,6 +96,28 @@ final class Perms {
         a.requestPermissions(new String[]{WatchNext.PERM}, REQ_TV_LISTINGS);
     }
 
+    /** Hume's accessibility switch is on (Power Off fallback, Clean, Home button, waking into an app). */
+    static boolean hasAccessibility(Activity a) {
+        return PowerService.instance != null;
+    }
+
+    /** Opens the TV's Accessibility settings with a short explanation of what the switch is for. */
+    static void requestAccessibility(Activity a, String why) {
+        if (hasAccessibility(a)) return;
+        Intent acc = accessibilityScreen(a);
+        if (acc == null) {
+            lastResort(a, "Hume Launcher switch", "adb shell settings put secure enabled_accessibility_services "
+                    + "com.petrobot.hume/com.petrobot.hume.PowerService\n"
+                    + "adb shell settings put secure accessibility_enabled 1");
+            return;
+        }
+        new AlertDialog.Builder(a, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Turn on Hume\u2019s switch")
+                .setMessage(why + "\n\nIn the next screen, choose \u201cHume Launcher\u201d and turn it on.")
+                .setPositiveButton("Open Accessibility", (d, w) -> tryStart(a, acc))
+                .setNegativeButton("Cancel", null).show();
+    }
+
     static void requestLocation(Activity a) {
         if (!hasLocation(a)) a.requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQ_LOCATION);
     }
@@ -115,8 +137,8 @@ final class Perms {
             Intent acc = accessibilityScreen(a);
             new AlertDialog.Builder(a, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                     .setTitle("Turn on Power Off")
-                    .setMessage("In the next screen, choose \u201cHume Launcher \u2013 Power Off\u201d and turn it on. "
-                            + "It only lets Hume put the TV to sleep.")
+                    .setMessage("In the next screen, choose \u201cHume Launcher\u201d and turn it on. "
+                            + "It lets Hume put the TV to sleep (and handle the Home button and Start with the TV).")
                     .setPositiveButton("Open Accessibility", (d, w) -> tryStart(a, acc))
                     .setNegativeButton("Cancel", null).show();
             return;
@@ -194,6 +216,13 @@ final class Perms {
         android.content.pm.ResolveInfo def = a.getPackageManager().resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY);
         boolean noDefault = def == null || def.activityInfo == null || "android".equals(def.activityInfo.packageName);
         if (noDefault && tryStart(a, home.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))) return;
+        // TVs that keep their own launcher (Google TV): Hume can take over the Home button instead.
+        if (accessibilityScreen(a) != null || hasAccessibility(a)) {
+            PowerService.HomeButton.setEnabled(a, true);
+            requestAccessibility(a, "This TV doesn\u2019t let you choose another home app. With Hume\u2019s switch on, "
+                    + "Hume opens whenever the TV\u2019s own home screen appears, so the Home button brings you here.");
+            return;
+        }
         lastResort(a, "Home screen",
                 "adb shell cmd package set-home-activity com.petrobot.hume/.MainActivity\n"
                         + "(on Google TV also: adb shell pm disable-user --user 0 com.google.android.tvlauncher)");

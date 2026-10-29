@@ -137,6 +137,7 @@ final class WatchNext {
                 it.title = title;
                 it.overview = episode(cur);
                 it.backdrop = art(cur);
+                it.logo = "";  // no TMDB logo lookup
                 it.link = str(cur, "intent_uri");
                 it.progress = progress;
                 it.remainingMin = left;

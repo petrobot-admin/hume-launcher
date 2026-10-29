@@ -2,6 +2,6 @@
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowStateChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:notificationTimeout="1000"
+    android:notificationTimeout="50"
     android:canRetrieveWindowContent="true"
     android:description="@string/power_service_desc" />
