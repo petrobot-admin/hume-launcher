@@ -8,7 +8,7 @@ Everything Hume Launcher does, by area. For how the code is organised see
 - [Status row](#status-row) · [Search](#search) · [Carousel (top shelf)](#carousel-top-shelf) · [Idle full-screen carousel](#idle-full-screen-carousel)
 - [Weather](#weather) · [Control Center](#control-center) · [Profiles](#profiles) · [Inputs](#inputs)
 - [Presentation mode](#presentation-mode) · [Screensaver](#screensaver) · [AirPlay](#airplay-with-the-airplay-server-app)
-- [Navigation sounds](#navigation-sounds) · [Settings](#settings) · [Permissions](#permissions) · [Display scaling](#display-scaling)
+- [Motion & sound](#motion--sound) · [Settings](#settings) · [Permissions](#permissions) · [Display scaling](#display-scaling)
 
 ## First-time setup
 
@@ -199,6 +199,8 @@ tile turns solid white.
 | Do Not Disturb | On / off |
 | Audio | Current output; opens sound settings |
 | Sleep Timer | Off → 15 → 30 → 60 → 90 min |
+| Motion | Full → Reduced → Off (see [Motion & sound](#motion--sound)) |
+| Sounds | Navigation sounds on / off |
 | Round shortcuts | Inputs (TVs with inputs; Accessibility otherwise), Bluetooth/controllers, Settings, Search |
 
 ![Control Center](images/control-center.jpg)
@@ -219,6 +221,10 @@ disabled: with **Hume's switch** on (an accessibility service), Hume opens whene
 home screen appears, from the Home button or Back out of an app. The stock launcher's window
 may flash for a moment. Only the name of the window that opened is checked. Settings → Home →
 *Home button opens Hume* (shows *Not needed* when Hume is already the home app).
+
+If Hume is **force-stopped** (App info → Force stop, or some TV "cleaner" apps), Android pauses its
+switch until the TV restarts or the switch is turned off and on again; Hume's prompt says so.
+Ordinary memory pressure doesn't do this — Android restarts the switch by itself.
 
 ## Start with the TV
 
@@ -265,10 +271,25 @@ does) whether the receiver is visible; if not, it restarts the receiver's server
 settings receiver, or starts a stopped app through its start-up receiver. Nothing appears on screen.
 The receiver's name is set in the AirPlay app (e.g. "Mi Box").
 
-## Navigation sounds
+## Motion & sound
 
-Android TV's own system sounds: a focus sound per D-pad direction and the key click on select and
-Back, at 60% of the normal level. Settings → Home → Navigation sounds.
+**Motion** (Settings → Home → Motion & Sound, or the Control Center tile; whole TV):
+
+| | |
+|---|---|
+| **Full** (default) | Every transition, plus motion that runs by itself: focus sway, and the carousel artwork slowly drifting closer (1.0 → 1.06 over 18 s, like Apple TV's Top Shelf) |
+| **Reduced** | Transitions at 60% length and half the slide distance; nothing moves by itself |
+| **Off** | Changes are instant |
+
+Apple-style cascades, everywhere something appears as a group (each item fades up from slightly
+below and slightly smaller, 22 ms after the one before): the app grid on first start and on
+switching profile, Control Center and Inputs tiles, the *Who's Watching?* avatars, Settings rows
+on every page, and each setup page's title, choices and buttons. Moving between apps (move mode)
+still wiggles at every level, since it shows what is being moved.
+
+**Navigation sounds**: Android TV's own system sounds, a focus sound per D-pad direction and the
+key click on select and Back, at 60% of the normal level. Settings → Home → Motion & Sound, or the
+Control Center tile.
 
 ## Settings
 

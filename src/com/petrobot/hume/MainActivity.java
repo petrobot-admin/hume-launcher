@@ -212,6 +212,8 @@ public class MainActivity extends Activity {
         dockPadV = dp(20);
 
         Clicks.init(this);
+
+        Motion.init(this);
         // Startup: the app list (package manager, banners, icon colours) and the wallpaper are
         // prepared in the background while the window's views are built (~250 ms saved on 1 GHz TVs).
         java.util.concurrent.Future<?> appsTask = io.submit(this::loadApps);
@@ -232,6 +234,7 @@ public class MainActivity extends Activity {
         }
         buildGrid();
         focusIndex(0);
+        Motion.cascade(tiles, dp(18));  // first appearance: the apps arrive one after another
         registerPackageReceiver();
         // Presentation mode: run the admin server if enabled, and honour "Start on boot".
         com.petrobot.hume.present.Presenter.ensureRunning(this);
@@ -356,7 +359,9 @@ public class MainActivity extends Activity {
         applyTabs();
         resetIdle();
         // Opened from the app list while another launcher is the home screen: offer once to take over.
-        if (SetupActivity.done(this) && !Perms.isDefaultHome(this) && !prefs.getBoolean("asked_default_home", false)) {
+        // Not asked while Hume's switch already sends the Home button here (the stock launcher stays default).
+        if (SetupActivity.done(this) && !Perms.isDefaultHome(this) && !PowerService.HomeButton.active(this)
+                && !prefs.getBoolean("asked_default_home", false)) {
             prefs.edit().putBoolean("asked_default_home", true).apply();
             new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                     .setTitle("Make Hume your home screen?")
@@ -536,7 +541,7 @@ public class MainActivity extends Activity {
         refreshButton.setOnFocusChangeListener((v, has) -> {
             refreshButton.setBackground(has ? rfLit : rfGlass);
             refreshButton.setImageBitmap(Glyphs.get("refresh", dp(20), has ? 0xFF111114 : Color.WHITE));
-            v.animate().scaleX(has ? 1.12f : 1f).scaleY(has ? 1.12f : 1f).setDuration(200).setInterpolator(LIFT).start();
+            v.animate().scaleX(has ? 1.12f : 1f).scaleY(has ? 1.12f : 1f).setDuration(Motion.d(200)).setInterpolator(LIFT).start();
         });
         refreshButton.setOnClickListener(v -> refreshAll());
 
@@ -558,7 +563,7 @@ public class MainActivity extends Activity {
         searchButton.setOnFocusChangeListener((v, has) -> {
             searchButton.setBackground(has ? seLit : seGlass);
             searchButton.setImageBitmap(Glyphs.get("search", dp(20), has ? 0xFF111114 : Color.WHITE));
-            v.animate().scaleX(has ? 1.12f : 1f).scaleY(has ? 1.12f : 1f).setDuration(200).setInterpolator(LIFT).start();
+            v.animate().scaleX(has ? 1.12f : 1f).scaleY(has ? 1.12f : 1f).setDuration(Motion.d(200)).setInterpolator(LIFT).start();
         });
         searchButton.setOnClickListener(v -> showSearch(null));
 
@@ -579,7 +584,7 @@ public class MainActivity extends Activity {
         ccButton.setOnFocusChangeListener((v, has) -> {
             ccButton.setBackground(has ? ccLit : ccGlass);
             ccButton.setImageBitmap(Glyphs.get("controls", dp(20), has ? 0xFF111114 : Color.WHITE));
-            v.animate().scaleX(has ? 1.12f : 1f).scaleY(has ? 1.12f : 1f).setDuration(200).setInterpolator(LIFT).start();
+            v.animate().scaleX(has ? 1.12f : 1f).scaleY(has ? 1.12f : 1f).setDuration(Motion.d(200)).setInterpolator(LIFT).start();
         });
         ccButton.setOnClickListener(v -> showControlCenter());
 
@@ -602,7 +607,7 @@ public class MainActivity extends Activity {
         clockBox.addView(avatar, alp);
         avatar.setOnFocusChangeListener((v, has) ->
                 v.animate().scaleX(has ? 1.18f : 1f).scaleY(has ? 1.18f : 1f).translationZ(has ? dp(8) : 0)
-                        .setDuration(200).setInterpolator(LIFT).start());
+                        .setDuration(Motion.d(200)).setInterpolator(LIFT).start());
         avatar.setOnClickListener(v -> showProfilePicker(false));
 
         // Room around the buttons for their focus growth (1.12x / 1.18x) so nothing is clipped;
@@ -628,7 +633,7 @@ public class MainActivity extends Activity {
             weatherGlass.setLit(has);
             if (has) v.setAlpha(1f);
             v.animate().scaleX(has ? 1.05f : 1f).scaleY(has ? 1.05f : 1f).translationZ(has ? dp(10) : 0)
-                    .setDuration(200).setInterpolator(LIFT).start();
+                    .setDuration(Motion.d(200)).setInterpolator(LIFT).start();
         });
         weatherCard.setPivotX(0);
         weatherCard.setPivotY(0);
@@ -755,26 +760,26 @@ public class MainActivity extends Activity {
                     label.setAlpha(1f);
                     label.setTranslationY(tileH * (FOCUS_SCALE - 1f) / 2f);
                 } else {
-                    v.animate().withLayer().scaleX(FOCUS_SCALE).scaleY(FOCUS_SCALE).translationZ(dp(18)).setDuration(260)
+                    v.animate().withLayer().scaleX(FOCUS_SCALE).scaleY(FOCUS_SCALE).translationZ(dp(18)).setDuration(Motion.d(260))
                             .setInterpolator(LIFT).start();
-                    label.animate().alpha(1f).translationY(tileH * (FOCUS_SCALE - 1f) / 2f).setDuration(200).start();
+                    label.animate().alpha(1f).translationY(tileH * (FOCUS_SCALE - 1f) / 2f).setDuration(Motion.d(200)).start();
                     // Liquid-glass illumination: a glare sweeps across once, then rests and
                     // drifts with the card's gentle sway (HIG: "gently sways while the surface
                     // illuminates").
                     glare.animate().cancel();
                     glare.setTranslationX(-tileW * 0.7f);
                     glare.setAlpha(1f);
-                    glare.animate().translationX(tileW * 1.1f).alpha(0f).setStartDelay(60).setDuration(700)
+                    glare.animate().translationX(tileW * 1.1f).alpha(0f).setStartDelay(Motion.d(60)).setDuration(Motion.d(700))
                             .setInterpolator(EASE).start();
                 }
-                topSheen.animate().alpha(1f).setDuration(200).start();
+                topSheen.animate().alpha(1f).setDuration(Motion.d(200)).start();
                 onTileFocused(index);
             } else {
                 cell.setTranslationZ(0);
                 stopSway(v);
-                v.animate().withLayer().scaleX(1f).scaleY(1f).translationZ(0).setDuration(180).setInterpolator(EASE).start();
-                label.animate().alpha(0f).translationY(0).setDuration(120).start();
-                topSheen.animate().alpha(0f).setDuration(160).start();
+                v.animate().withLayer().scaleX(1f).scaleY(1f).translationZ(0).setDuration(Motion.d(180)).setInterpolator(EASE).start();
+                label.animate().alpha(0f).translationY(0).setDuration(Motion.d(120)).start();
+                topSheen.animate().alpha(0f).setDuration(Motion.d(160)).start();
                 glare.animate().cancel();
                 glare.setAlpha(0f);
             }
@@ -785,9 +790,9 @@ public class MainActivity extends Activity {
             if (moveIndex >= 0 || launchOverlay != null) return;
             // Pressed state (HIG): the card dips instantly, then the action runs.
             stopSway(v);
-            v.animate().scaleX(FOCUS_SCALE * 0.92f).scaleY(FOCUS_SCALE * 0.92f).setDuration(90)
+            v.animate().scaleX(FOCUS_SCALE * 0.92f).scaleY(FOCUS_SCALE * 0.92f).setDuration(Motion.d(90))
                     .setInterpolator(EASE).withEndAction(() -> {
-                        v.animate().scaleX(FOCUS_SCALE).scaleY(FOCUS_SCALE).setDuration(140).setInterpolator(LIFT).start();
+                        v.animate().scaleX(FOCUS_SCALE).scaleY(FOCUS_SCALE).setDuration(Motion.d(140)).setInterpolator(LIFT).start();
                         if (FOLDER_KEY.equals(a.key)) enterFolder();
                         else launchAnimated(v, a);
                     }).start();
@@ -1587,7 +1592,7 @@ public class MainActivity extends Activity {
         root.addView(switcher, lp);
         switcher.setOnFocusChangeListener((v, has) -> {
             styleTabs();
-            v.animate().scaleX(has ? 1.08f : 1f).scaleY(has ? 1.08f : 1f).setDuration(200).setInterpolator(LIFT).start();
+            v.animate().scaleX(has ? 1.08f : 1f).scaleY(has ? 1.08f : 1f).setDuration(Motion.d(200)).setInterpolator(LIFT).start();
             if (has) setHeroShown(!heroItems.isEmpty());
         });
         styleTabs();
@@ -1734,7 +1739,7 @@ public class MainActivity extends Activity {
                     ? "Continue Watching needs Android TV 8 or later."
                     : "To see what you watch here, allow it in Settings \u2192 Permissions.");
         }
-        shelfEmpty.animate().alpha(show ? 0.75f : 0f).setDuration(250).start();
+        shelfEmpty.animate().alpha(show ? 0.75f : 0f).setDuration(Motion.d(250)).start();
     }
 
     void setHeroItems(List<Suggestions.Item> items) {
@@ -1787,15 +1792,15 @@ public class MainActivity extends Activity {
         invalidateGlass();
         float a = show ? 1f : 0f;
         if (!show) wallView.setVisibility(View.VISIBLE);
-        heroFront.animate().alpha(a).setDuration(450).withEndAction(() -> {
+        heroFront.animate().alpha(a).setDuration(Motion.d(450)).withEndAction(() -> {
             if (heroShown && heroFront.getAlpha() >= 1f) wallView.setVisibility(View.INVISIBLE);
         }).start();
         heroScrim.setVisibility(View.GONE);
 
-        heroInfo.animate().withLayer().alpha(a).setDuration(350).start();
-        heroDots.animate().alpha(a).setDuration(350).start();
-        chevron.animate().alpha(1f - a).setDuration(350).start();
-        heroBack.animate().alpha(0f).setDuration(450).start();
+        heroInfo.animate().withLayer().alpha(a).setDuration(Motion.d(350)).start();
+        heroDots.animate().alpha(a).setDuration(Motion.d(350)).start();
+        chevron.animate().alpha(1f - a).setDuration(Motion.d(350)).start();
+        heroBack.animate().alpha(0f).setDuration(Motion.d(450)).start();
         handler.removeCallbacks(heroAdvance);
         if (show) scheduleAdvance();
     }
@@ -1819,7 +1824,7 @@ public class MainActivity extends Activity {
         heroIndex = index;
         Suggestions.Item it = heroItems.get(index);
         for (int i = 0; i < heroDots.getChildCount(); i++) {
-            heroDots.getChildAt(i).animate().alpha(i == index ? 1f : 0.35f).setDuration(250).start();
+            heroDots.getChildAt(i).animate().alpha(i == index ? 1f : 0.35f).setDuration(Motion.d(250)).start();
         }
         int want = index;
         io.execute(() -> {
@@ -1871,7 +1876,8 @@ public class MainActivity extends Activity {
             boolean app = "app".equals(it.type);
             List<String> meta = new ArrayList<>();
             meta.add(appLabel(it.pkg));
-            if (!it.genres.isEmpty()) meta.add(it.genres);  // Watch Next "Up Next" / "New", or the app's row name
+            // Watch Next "Up Next" / "New", or the app's row name (unless it just repeats the app's name)
+            if (!it.genres.isEmpty() && !it.genres.equalsIgnoreCase(meta.get(0))) meta.add(it.genres);
             if (it.remainingMin > 0) meta.add(it.remainingMin >= 60
                     ? (it.remainingMin / 60) + " h " + (it.remainingMin % 60) + " min left" : it.remainingMin + " min left");
             heroMeta.setText(String.join("  \u00B7  ", meta));
@@ -1888,7 +1894,7 @@ public class MainActivity extends Activity {
                 heroInfo.animate().cancel();
                 heroInfo.setAlpha(0f);
                 heroInfo.setTranslationX(dp(28) * dir);
-                heroInfo.animate().withLayer().alpha(1f).translationX(0).setDuration(520).setInterpolator(EASE).start();
+                heroInfo.animate().withLayer().alpha(1f).translationX(0).setDuration(Motion.d(520)).setInterpolator(EASE).start();
             }
             return;
         }
@@ -1909,7 +1915,7 @@ public class MainActivity extends Activity {
                 heroInfo.animate().cancel();
                 heroInfo.setAlpha(0f);
                 heroInfo.setTranslationX(dp(28) * dir);
-                heroInfo.animate().withLayer().alpha(1f).translationX(0).setDuration(520).setInterpolator(EASE).start();
+                heroInfo.animate().withLayer().alpha(1f).translationX(0).setDuration(Motion.d(520)).setInterpolator(EASE).start();
             }
             return;
         }
@@ -1936,7 +1942,7 @@ public class MainActivity extends Activity {
             heroInfo.animate().cancel();
             heroInfo.setAlpha(0f);
             heroInfo.setTranslationX(dp(28) * dir);
-            heroInfo.animate().withLayer().alpha(1f).translationX(0).setDuration(520).setInterpolator(EASE).start();
+            heroInfo.animate().withLayer().alpha(1f).translationX(0).setDuration(Motion.d(520)).setInterpolator(EASE).start();
         }
     }
 
@@ -1944,6 +1950,25 @@ public class MainActivity extends Activity {
      * Artwork transition (tvOS carousel): the new image slides in from the side you pressed and
      * fades up over the old one, which drifts the other way and fades out.
      */
+    ObjectAnimator heroZoom;
+
+    /**
+     * The carousel artwork drifts slowly closer while it is on screen (Apple TV's Top Shelf and
+     * screensaver feel): 1.0 → 1.06 over 18 s. Only with Motion at Full.
+     */
+    void slowZoom(ImageView v) {
+        if (heroZoom != null) heroZoom.cancel();
+        v.setScaleX(1f);
+        v.setScaleY(1f);
+        if (!Motion.ambient()) return;
+        heroZoom = ObjectAnimator.ofPropertyValuesHolder(v,
+                android.animation.PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, 1.06f),
+                android.animation.PropertyValuesHolder.ofFloat(View.SCALE_Y, 1f, 1.06f));
+        heroZoom.setDuration(18000);
+        heroZoom.setInterpolator(new PathInterpolator(0.3f, 0f, 0.7f, 1f));
+        heroZoom.start();
+    }
+
     void crossfadeHero(Bitmap bd, int dir) {
         ImageView next = heroBack;
         heroBack = heroFront;
@@ -1951,6 +1976,7 @@ public class MainActivity extends Activity {
         ImageView old = heroBack;
         next.animate().cancel();
         next.setImageBitmap(bd);
+        slowZoom(next);
         float target = heroShown ? 1f : 0f;
         if (dir == 0 || !heroShown) {
             next.setTranslationX(0);
@@ -1960,9 +1986,9 @@ public class MainActivity extends Activity {
         }
         next.setTranslationX(screenW * 0.12f * dir);
         next.setAlpha(0f);
-        next.animate().translationX(0).alpha(1f).setDuration(650).setInterpolator(EASE).start();
+        next.animate().translationX(0).alpha(1f).setDuration(Motion.d(650)).setInterpolator(EASE).start();
         old.animate().cancel();
-        old.animate().translationX(-screenW * 0.06f * dir).alpha(0f).setDuration(650)
+        old.animate().translationX(-screenW * 0.06f * dir).alpha(0f).setDuration(Motion.d(650))
                 .setInterpolator(EASE).withEndAction(() -> old.setTranslationX(0)).start();
     }
 
@@ -1996,37 +2022,37 @@ public class MainActivity extends Activity {
         if (!has) heroRequested = false;
         if (has) {
             setHeroShown(true);
-            heroButton.animate().scaleX(1.08f).scaleY(1.08f).setDuration(240).setInterpolator(LIFT).start();
+            heroButton.animate().scaleX(1.08f).scaleY(1.08f).setDuration(Motion.d(240)).setInterpolator(LIFT).start();
             heroButton.setElevation(dp(10));
             heroBtnBg.setColor(0xFFFFFFFF);
             heroBtnText.setTextColor(0xFF111114);
             scroll.smoothScrollTo(0, 0);
-            scroll.animate().withLayer().translationY(screenH - shelfH + dp(30)).setDuration(500).setInterpolator(EASE)
+            scroll.animate().withLayer().translationY(screenH - shelfH + dp(30)).setDuration(Motion.d(500)).setInterpolator(EASE)
                     .setUpdateListener(null).withEndAction(this::invalidateGlass).start();
-            heroInfo.animate().withLayer().translationY(0).setDuration(500).setInterpolator(EASE).start();
-            heroDots.animate().withLayer().translationY(0).setDuration(500).setInterpolator(EASE).start();
+            heroInfo.animate().withLayer().translationY(0).setDuration(Motion.d(500)).setInterpolator(EASE).start();
+            heroDots.animate().withLayer().translationY(0).setDuration(Motion.d(500)).setInterpolator(EASE).start();
             heroOverview.setVisibility(View.VISIBLE);
             heroButton.setVisibility(heroIsNews() ? View.GONE : View.VISIBLE);
             heroRemove.setVisibility(heroIsContinue() ? View.VISIBLE : View.GONE);
             heroRemove.setAlpha(0.7f);
             if (continueMode() && heroStrip.getChildCount() > 0) heroStrip.setVisibility(View.VISIBLE);
-            heroOverview.animate().alpha(0.85f).setDuration(400).setStartDelay(120).start();
-            heroButton.animate().alpha(1f).setDuration(400).setStartDelay(120).start();
+            heroOverview.animate().alpha(0.85f).setDuration(Motion.d(400)).setStartDelay(Motion.d(120)).start();
+            heroButton.animate().alpha(1f).setDuration(Motion.d(400)).setStartDelay(Motion.d(120)).start();
             handler.removeCallbacks(heroAdvance);
         } else {
-            heroButton.animate().scaleX(1f).scaleY(1f).setDuration(180).start();
+            heroButton.animate().scaleX(1f).scaleY(1f).setDuration(Motion.d(180)).start();
             heroButton.setElevation(0);
             heroBtnBg.setColor(0x47FFFFFF);
             heroBtnText.setTextColor(Color.WHITE);
-            scroll.animate().withLayer().translationY(0).setDuration(450).setInterpolator(EASE)
+            scroll.animate().withLayer().translationY(0).setDuration(Motion.d(450)).setInterpolator(EASE)
                     .setUpdateListener(null).withEndAction(this::invalidateGlass).start();
-            heroInfo.animate().withLayer().translationY(heroInfoRestY()).setDuration(450).setInterpolator(EASE).start();
-            heroDots.animate().withLayer().translationY(heroDotsRestY()).setDuration(450).setInterpolator(EASE).start();
+            heroInfo.animate().withLayer().translationY(heroInfoRestY()).setDuration(Motion.d(450)).setInterpolator(EASE).start();
+            heroDots.animate().withLayer().translationY(heroDotsRestY()).setDuration(Motion.d(450)).setInterpolator(EASE).start();
             if (!heroIsNews()) {
-                heroOverview.animate().alpha(0f).setDuration(160).setStartDelay(0)
+                heroOverview.animate().alpha(0f).setDuration(Motion.d(160)).setStartDelay(0)
                         .withEndAction(() -> heroOverview.setVisibility(View.GONE)).start();
             }
-            heroButton.animate().alpha(0f).setDuration(160).setStartDelay(0)
+            heroButton.animate().alpha(0f).setDuration(Motion.d(160)).setStartDelay(0)
                     .withEndAction(() -> heroButton.setVisibility(View.GONE)).start();
             heroRemove.setVisibility(View.GONE);
             heroStrip.setVisibility(View.GONE);
@@ -2244,7 +2270,7 @@ public class MainActivity extends Activity {
 
     /** Slow elliptical tilt of the focused card with the highlight drifting against it. */
     void startSway(View v, View glare) {
-        if (moveIndex >= 0 || !v.hasFocus() && !v.isFocused()) return;
+        if (!Motion.ambient() || moveIndex >= 0 || !v.hasFocus() && !v.isFocused()) return;
         stopSway(swayView);
         swayView = v;
         sway = ValueAnimator.ofFloat(0f, (float) (2 * Math.PI));
@@ -2265,7 +2291,7 @@ public class MainActivity extends Activity {
             sway.cancel();
             sway = null;
             if (swayView != null) {
-                swayView.animate().rotationX(0).rotationY(0).setDuration(160).start();
+                swayView.animate().rotationX(0).rotationY(0).setDuration(Motion.d(160)).start();
             }
             swayView = null;
         }
@@ -2311,16 +2337,16 @@ public class MainActivity extends Activity {
         tile.setAlpha(0f);
 
         ValueAnimator zoom = ValueAnimator.ofFloat(0f, 1f);
-        zoom.setDuration(480);
+        zoom.setDuration(Motion.d(480));
         zoom.setInterpolator(EASE);
         zoom.addUpdateListener(an -> art.setProgress((float) an.getAnimatedValue()));
         zoom.start();
 
-        scroll.animate().withLayer().scaleX(0.9f).scaleY(0.9f).alpha(0f).setDuration(420).setInterpolator(EASE)
+        scroll.animate().withLayer().scaleX(0.9f).scaleY(0.9f).alpha(0f).setDuration(Motion.d(420)).setInterpolator(EASE)
                 .setUpdateListener(null).start();
-        clockBox.animate().alpha(0f).setDuration(250).start();
-        switcher.animate().alpha(0f).setDuration(250).start();
-        weatherCard.animate().alpha(0f).setDuration(250).start();
+        clockBox.animate().alpha(0f).setDuration(Motion.d(250)).start();
+        switcher.animate().alpha(0f).setDuration(Motion.d(250)).start();
+        weatherCard.animate().alpha(0f).setDuration(Motion.d(250)).start();
 
         handler.postDelayed(() -> {
             try {
@@ -2346,13 +2372,13 @@ public class MainActivity extends Activity {
 
         scroll.setScaleX(1.06f);
         scroll.setScaleY(1.06f);
-        scroll.animate().withLayer().scaleX(1f).scaleY(1f).alpha(1f).setDuration(420).setInterpolator(EASE)
+        scroll.animate().withLayer().scaleX(1f).scaleY(1f).alpha(1f).setDuration(Motion.d(420)).setInterpolator(EASE)
                 .setUpdateListener(null).withEndAction(this::invalidateGlass).start();
-        clockBox.animate().alpha(clockAlpha()).setDuration(420).start();
-        switcher.animate().alpha(folderMode ? 0f : clockAlpha()).setDuration(420).start();
-        weatherCard.animate().alpha(weatherAlpha()).setDuration(420).start();
-        if (tile != null) tile.animate().alpha(1f).setDuration(300).start();
-        ov.animate().withLayer().alpha(0f).scaleX(0.96f).scaleY(0.96f).setDuration(300)
+        clockBox.animate().alpha(clockAlpha()).setDuration(Motion.d(420)).start();
+        switcher.animate().alpha(folderMode ? 0f : clockAlpha()).setDuration(Motion.d(420)).start();
+        weatherCard.animate().alpha(weatherAlpha()).setDuration(Motion.d(420)).start();
+        if (tile != null) tile.animate().alpha(1f).setDuration(Motion.d(300)).start();
+        ov.animate().withLayer().alpha(0f).scaleX(0.96f).scaleY(0.96f).setDuration(Motion.d(300))
                 .setListener(new AnimatorListenerAdapter() {
                     @Override public void onAnimationEnd(Animator animation) {
                         root.removeView(ov);
@@ -2490,7 +2516,7 @@ public class MainActivity extends Activity {
         for (int i = 0; i < heroStrip.getChildCount(); i++) {
             View v = heroStrip.getChildAt(i);
             boolean on = i == index;
-            v.animate().scaleX(on ? 1.12f : 1f).scaleY(on ? 1.12f : 1f).alpha(on ? 1f : 0.6f).setDuration(220)
+            v.animate().scaleX(on ? 1.12f : 1f).scaleY(on ? 1.12f : 1f).alpha(on ? 1f : 0.6f).setDuration(Motion.d(220))
                     .setInterpolator(LIFT).start();
         }
     }
@@ -2713,8 +2739,8 @@ public class MainActivity extends Activity {
     void exitFolder() {
         animateGridSwap(() -> {
             folderMode = false;
-            switcher.animate().alpha(1f).setDuration(250).start();
-            weatherCard.animate().alpha(weatherAlpha()).setDuration(250).start();
+            switcher.animate().alpha(1f).setDuration(Motion.d(250)).start();
+            weatherCard.animate().alpha(weatherAlpha()).setDuration(Motion.d(250)).start();
             buildGrid();
             shelfEntry = null;
             int i = indexOfKey(FOLDER_KEY);
@@ -2724,12 +2750,12 @@ public class MainActivity extends Activity {
 
     /** Quick zoom-through between home and folder, so it reads as "opening" the folder. */
     void animateGridSwap(Runnable swap) {
-        scroll.animate().alpha(0f).scaleX(0.94f).scaleY(0.94f).setDuration(140).setInterpolator(EASE)
+        scroll.animate().alpha(0f).scaleX(0.94f).scaleY(0.94f).setDuration(Motion.d(140)).setInterpolator(EASE)
                 .withEndAction(() -> {
                     swap.run();
                     scroll.setScaleX(1.04f);
                     scroll.setScaleY(1.04f);
-                    scroll.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(260).setInterpolator(EASE)
+                    scroll.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(Motion.d(260)).setInterpolator(EASE)
                             .withEndAction(null).start();
                 }).start();
     }
@@ -2995,10 +3021,17 @@ public class MainActivity extends Activity {
     }
 
     void reload(String focusKey) {
+        // An app installed or updated in the background (Play Store) mustn't pull focus out of the
+        // carousel the person is browsing.
+        boolean onShelf = shelfView.isFocused();
         loadApps();
         if (folderMode && hiddenApps.isEmpty()) folderMode = false;
         buildGrid();
         shelfEntry = null;
+        if (onShelf) {
+            focusedIndex = Math.min(focusedIndex, Math.max(0, shown.size() - 1));
+            return;
+        }
         int i = focusKey == null ? -1 : indexOfKey(focusKey);
         focusIndex(i >= 0 ? i : Math.min(focusedIndex, shown.size() - 1));
     }
@@ -3128,8 +3161,14 @@ public class MainActivity extends Activity {
                 v -> Suggestions.start(this, new Intent("android.settings.SOUND_SETTINGS"))));
         cells.add(ccTile(panel, col + gap, y3, col, cap, "timer", "Sleep Timer", this::timerState, false,
                 v -> cycleSleepTimer()));
-        // Row 4: round shortcuts \u2014 Inputs (TVs with inputs) or Accessibility, controllers, Settings, Search.
-        int y4 = y3 + cap + gap;
+        // Row 4: Motion | Sounds (OK cycles Full / Reduced / Off; toggles navigation sounds).
+        int yMs = y3 + cap + gap;
+        cells.add(ccTile(panel, 0, yMs, col, cap, "motion", "Motion", () -> Motion.NAMES[Motion.level()], false,
+                v -> Motion.cycle(this)));
+        cells.add(ccTile(panel, col + gap, yMs, col, cap, "sound", "Sounds", () -> Clicks.enabled(this) ? "On" : "Off", false,
+                v -> Clicks.setEnabled(this, !Clicks.enabled(this))));
+        // Row 5: round shortcuts \u2014 Inputs (TVs with inputs) or Accessibility, controllers, Settings, Search.
+        int y4 = yMs + cap + gap;
         String[] g = inputs.isEmpty() ? new String[]{"gamepad", "accessibility", "gear", "search"}
                 : new String[]{"input", "gamepad", "gear", "search"};
         for (int i = 0; i < g.length; i++) {
@@ -3163,9 +3202,10 @@ public class MainActivity extends Activity {
         pickerLayer = layer;
         pickerCells = cells;
         layer.setAlpha(0f);
-        panel.setTranslationY(-dp(10));
-        layer.animate().alpha(1f).setDuration(200).start();
-        panel.animate().translationY(0).setDuration(260).setInterpolator(EASE).start();
+        panel.setTranslationY(-Motion.dist(dp(10)));
+        layer.animate().alpha(1f).setDuration(Motion.d(200)).start();
+        panel.animate().translationY(0).setDuration(Motion.d(260)).setInterpolator(EASE).start();
+        Motion.cascade(cells, -dp(8));  // tiles drop in one after another, like tvOS
         cells.get(0).requestFocus();
     }
 
@@ -3244,7 +3284,7 @@ public class MainActivity extends Activity {
                 ((GradientDrawable) memBarFill.getBackground()).setColor(has ? 0xFF111114 : (memoryUsed() > 0.85f ? 0xFFFF9F0A : Color.WHITE));
             }
             v.animate().scaleX(has ? 1.06f : 1f).scaleY(has ? 1.06f : 1f).translationZ(has ? dp(10) : 0)
-                    .setDuration(200).setInterpolator(LIFT).start();
+                    .setDuration(Motion.d(200)).setInterpolator(LIFT).start();
         });
         t.setOnClickListener(v -> {
             click.onClick(v);
@@ -3478,9 +3518,10 @@ public class MainActivity extends Activity {
         pickerLayer = layer;
         pickerCells = cells;
         layer.setAlpha(0f);
-        panel.setTranslationY(-dp(10));
-        layer.animate().alpha(1f).setDuration(200).start();
-        panel.animate().translationY(0).setDuration(260).setInterpolator(EASE).start();
+        panel.setTranslationY(-Motion.dist(dp(10)));
+        layer.animate().alpha(1f).setDuration(Motion.d(200)).start();
+        panel.animate().translationY(0).setDuration(Motion.d(260)).setInterpolator(EASE).start();
+        Motion.cascade(cells, -dp(8));  // tiles drop in one after another, like tvOS
         cells.get(0).requestFocus();
     }
 
@@ -3654,7 +3695,7 @@ public class MainActivity extends Activity {
     void refreshAll() {
         refreshButton.animate().cancel();
         refreshButton.setRotation(0);
-        refreshButton.animate().rotation(360).setDuration(700).setInterpolator(EASE).start();
+        refreshButton.animate().rotation(360).setDuration(Motion.d(700)).setInterpolator(EASE).start();
         Suggestions.changed(this);
         AppRows.invalidate();
         lastCwSig = "";
@@ -3703,16 +3744,16 @@ public class MainActivity extends Activity {
         idleDotsY = heroDots.getTranslationY();
         idleOverviewShown = heroOverview.getVisibility() == View.VISIBLE;
         scroll.animate().cancel();
-        scroll.animate().withLayer().translationY(screenH).alpha(0f).setDuration(900).setInterpolator(EASE)
+        scroll.animate().withLayer().translationY(screenH).alpha(0f).setDuration(Motion.d(900)).setInterpolator(EASE)
                 .setUpdateListener(null).start();
-        heroInfo.animate().withLayer().translationY(0).setDuration(900).setInterpolator(EASE).start();
-        heroDots.animate().withLayer().translationY(dp(4)).setDuration(900).setInterpolator(EASE).start();
-        weatherCard.animate().alpha(0f).setDuration(500).start();
-        switcher.animate().alpha(0f).setDuration(500).start();
-        heroButton.animate().alpha(0f).setDuration(300).start();
+        heroInfo.animate().withLayer().translationY(0).setDuration(Motion.d(900)).setInterpolator(EASE).start();
+        heroDots.animate().withLayer().translationY(dp(4)).setDuration(Motion.d(900)).setInterpolator(EASE).start();
+        weatherCard.animate().alpha(0f).setDuration(Motion.d(500)).start();
+        switcher.animate().alpha(0f).setDuration(Motion.d(500)).start();
+        heroButton.animate().alpha(0f).setDuration(Motion.d(300)).start();
         heroOverview.animate().cancel();
         heroOverview.setVisibility(heroOverview.getText().length() > 0 ? View.VISIBLE : View.GONE);
-        heroOverview.animate().alpha(0.85f).setDuration(600).start();
+        heroOverview.animate().alpha(0.85f).setDuration(Motion.d(600)).start();
         handler.removeCallbacks(heroAdvance);
         scheduleAdvance();
     }
@@ -3721,18 +3762,18 @@ public class MainActivity extends Activity {
         if (!idle) return;
         idle = false;
         scroll.animate().cancel();
-        scroll.animate().withLayer().translationY(idleScrollY).alpha(1f).setDuration(450).setInterpolator(EASE)
+        scroll.animate().withLayer().translationY(idleScrollY).alpha(1f).setDuration(Motion.d(450)).setInterpolator(EASE)
                 .setUpdateListener(null).withEndAction(this::invalidateGlass).start();
-        heroInfo.animate().withLayer().translationY(idleInfoY).setDuration(450).setInterpolator(EASE).start();
-        heroDots.animate().withLayer().translationY(idleDotsY).setDuration(450).setInterpolator(EASE).start();
-        weatherCard.animate().alpha(weatherAlpha()).setDuration(350).start();
-        switcher.animate().alpha(folderMode ? 0f : clockAlpha()).setDuration(350).start();
+        heroInfo.animate().withLayer().translationY(idleInfoY).setDuration(Motion.d(450)).setInterpolator(EASE).start();
+        heroDots.animate().withLayer().translationY(idleDotsY).setDuration(Motion.d(450)).setInterpolator(EASE).start();
+        weatherCard.animate().alpha(weatherAlpha()).setDuration(Motion.d(350)).start();
+        switcher.animate().alpha(folderMode ? 0f : clockAlpha()).setDuration(Motion.d(350)).start();
         if (shelfView.isFocused()) {
-            heroButton.animate().alpha(1f).setDuration(300).start();
+            heroButton.animate().alpha(1f).setDuration(Motion.d(300)).start();
             handler.removeCallbacks(heroAdvance);  // browsing by hand: no auto-advance
         }
         if (!idleOverviewShown && !heroIsNews()) {
-            heroOverview.animate().alpha(0f).setDuration(200)
+            heroOverview.animate().alpha(0f).setDuration(Motion.d(200))
                     .withEndAction(() -> heroOverview.setVisibility(View.GONE)).start();
         }
         resetIdle();
@@ -3810,11 +3851,11 @@ public class MainActivity extends Activity {
         pickerCells = new ArrayList<>();
         pickerCells.add(panel);
         weatherOpen = true;
-        weatherCard.animate().alpha(0f).setDuration(150).start();
+        weatherCard.animate().alpha(0f).setDuration(Motion.d(150)).start();
         layer.setAlpha(0f);
         panel.setTranslationY(-dp(10));
-        layer.animate().alpha(1f).setDuration(200).start();
-        panel.animate().translationY(0).setDuration(260).setInterpolator(EASE).start();
+        layer.animate().alpha(1f).setDuration(Motion.d(200)).start();
+        panel.animate().translationY(0).setDuration(Motion.d(260)).setInterpolator(EASE).start();
         panel.requestFocus();
         Weather.refresh(this, false, () -> {
             Weather.Data nd = Weather.cached(this);
@@ -3934,8 +3975,9 @@ public class MainActivity extends Activity {
         layer.setAlpha(0f);
         col.setScaleX(0.96f);
         col.setScaleY(0.96f);
-        layer.animate().alpha(1f).setDuration(onWake ? 380 : 260).start();
-        col.animate().scaleX(1f).scaleY(1f).setDuration(onWake ? 420 : 300).setInterpolator(EASE).start();
+        layer.animate().alpha(1f).setDuration(Motion.d(onWake ? 380 : 260)).start();
+        col.animate().scaleX(1f).scaleY(1f).setDuration(Motion.d(onWake ? 420 : 300)).setInterpolator(EASE).start();
+        Motion.cascade(cells, dp(24));  // avatars rise in one after another
         View focus = cells.isEmpty() ? null : cells.get(0);
         for (View c : cells) if (cur.equals(c.getTag())) focus = c;
         if (focus != null) {
@@ -3964,7 +4006,7 @@ public class MainActivity extends Activity {
         SearchPanel opened = search;
         search.layer.setAlpha(0f);
         // Once search covers the screen, the Home layers under it stop drawing (the backdrop is a snapshot).
-        search.layer.animate().alpha(1f).setDuration(200).withEndAction(() -> {
+        search.layer.animate().alpha(1f).setDuration(Motion.d(200)).withEndAction(() -> {
             if (search != opened) return;
             hiddenUnderSearch.clear();
             for (int i = 0; i < root.getChildCount(); i++) {
@@ -4042,7 +4084,7 @@ public class MainActivity extends Activity {
         releaseSearch();
         if (pickerLayer == l) {
             pickerLayer = null;
-            l.animate().alpha(0f).setDuration(200).withEndAction(() -> root.removeView(l)).start();
+            l.animate().alpha(0f).setDuration(Motion.d(200)).withEndAction(() -> root.removeView(l)).start();
         }
         if (popoverReturn != null && popoverReturn.isAttachedToWindow()) popoverReturn.requestFocus();
         else goTop();
@@ -4181,8 +4223,8 @@ public class MainActivity extends Activity {
         cell.addView(label, llp);
         cell.setOnFocusChangeListener((v, has) -> {
             picBox.animate().scaleX(has ? 1.12f : 1f).scaleY(has ? 1.12f : 1f).translationZ(has ? dp(12) : 0)
-                    .setDuration(220).setInterpolator(LIFT).start();
-            label.animate().alpha(has ? 1f : 0.7f).translationY(has ? dp(5) : 0).setDuration(200).start();
+                    .setDuration(Motion.d(220)).setInterpolator(LIFT).start();
+            label.animate().alpha(has ? 1f : 0.7f).translationY(has ? dp(5) : 0).setDuration(Motion.d(200)).start();
         });
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         lp.leftMargin = dp(8);
@@ -4217,9 +4259,9 @@ public class MainActivity extends Activity {
         if (pickerLayer == null) return;
         FrameLayout l = pickerLayer;
         pickerLayer = null;
-        l.animate().alpha(0f).setDuration(220).withEndAction(() -> root.removeView(l)).start();
+        l.animate().alpha(0f).setDuration(Motion.d(220)).withEndAction(() -> root.removeView(l)).start();
         weatherOpen = false;
-        weatherCard.animate().alpha(weatherAlpha()).setDuration(220).start();
+        weatherCard.animate().alpha(weatherAlpha()).setDuration(Motion.d(220)).start();
         if (popoverReturn != null && popoverReturn.isAttachedToWindow()) popoverReturn.requestFocus();
         else goTop();
         popoverReturn = null;
@@ -4344,6 +4386,7 @@ public class MainActivity extends Activity {
         buildGrid();
         shelfEntry = null;
         focusIndex(0);
+        Motion.cascade(tiles, dp(18));  // the new profile's apps arrive one after another
         loadHero();
     }
 
@@ -4402,7 +4445,7 @@ public class MainActivity extends Activity {
             row.setOnFocusChangeListener((v, has) -> {
                 pill.setColor(has ? 0xFFFFFFFF : Color.TRANSPARENT);
                 row.setTextColor(has ? (idx == destructive ? 0xFFD7372A : 0xFF111114) : base);
-                v.animate().scaleX(has ? 1.04f : 1f).scaleY(has ? 1.04f : 1f).setDuration(160).setInterpolator(LIFT).start();
+                v.animate().scaleX(has ? 1.04f : 1f).scaleY(has ? 1.04f : 1f).setDuration(Motion.d(160)).setInterpolator(LIFT).start();
             });
             row.setOnClickListener(v -> {
                 closeMenu();
@@ -4449,8 +4492,8 @@ public class MainActivity extends Activity {
         panel.setAlpha(0f);
         panel.setScaleX(0.9f);
         panel.setScaleY(0.9f);
-        panel.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(220).setInterpolator(LIFT).start();
-        menuLayer.animate().setDuration(220).start();
+        panel.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(Motion.d(220)).setInterpolator(LIFT).start();
+        menuLayer.animate().setDuration(Motion.d(220)).start();
         menuLayer.setBackgroundColor(0x59000000);
         if (!rows.isEmpty()) rows.get(0).requestFocus();
     }
@@ -4459,7 +4502,7 @@ public class MainActivity extends Activity {
         if (menuLayer == null) return;
         FrameLayout m = menuLayer;
         menuLayer = null;
-        m.animate().alpha(0f).setDuration(150).withEndAction(() -> root.removeView(m)).start();
+        m.animate().alpha(0f).setDuration(Motion.d(150)).withEndAction(() -> root.removeView(m)).start();
         if (menuReturnFocus != null && menuReturnFocus.isAttachedToWindow()) menuReturnFocus.requestFocus();
         menuReturnFocus = null;
     }
@@ -4531,12 +4574,12 @@ public class MainActivity extends Activity {
                         cell.setAlpha(0f);
                         cell.setScaleX(0.86f);
                         cell.setScaleY(0.86f);
-                        cell.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(240).setInterpolator(EASE).start();
+                        cell.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(Motion.d(240)).setInterpolator(EASE).start();
                         continue;
                     }
                     t.setTranslationX(dx);
                     t.setTranslationY(dy);
-                    t.animate().translationX(0).translationY(0).setDuration(260).setInterpolator(EASE).start();
+                    t.animate().translationX(0).translationY(0).setDuration(Motion.d(260)).setInterpolator(EASE).start();
                 }
                 return true;
             }

@@ -36,6 +36,7 @@ public class SettingsActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         Clicks.init(this);
+        Motion.init(this);
         String token = getIntent().getStringExtra("tmdb_token");
         if (token != null && !token.trim().isEmpty()) {
             Suggestions.prefs(this).edit().putString(Suggestions.K_TOKEN, token.trim()).apply();
@@ -88,6 +89,7 @@ public class SettingsActivity extends Activity {
         lastPage = page;
         page = p;
         list.removeAllViews();
+        rowsByLabel.clear();
         refreshers.clear();
         navRows.clear();
         buildLeft(p);
@@ -116,8 +118,12 @@ public class SettingsActivity extends Activity {
         }
         if (focus != null) focus.requestFocus();
         list.setAlpha(0f);
-        list.setTranslationX(Ui.px(this, p.equals(ROOT) ? -16 : 16));
-        list.animate().alpha(1f).translationX(0).setDuration(220).start();
+        list.setTranslationX(Motion.dist(Ui.px(this, p.equals(ROOT) ? -16 : 16)));
+        list.animate().alpha(1f).translationX(0).setDuration(Motion.d(220)).start();
+        // Rows settle in one after another (tvOS Settings).
+        List<android.view.View> rows = new ArrayList<>();
+        for (int i = 0; i < list.getChildCount(); i++) rows.add(list.getChildAt(i));
+        Motion.cascade(rows, Ui.px(this, 8));
     }
 
     @Override
@@ -279,7 +285,7 @@ public class SettingsActivity extends Activity {
             dialog("Show in carousel").setSingleChoiceItems(names, sel, (d, w) -> {
                 Suggestions.setShelf(this, keys[w]);
                 d.dismiss();
-                show(SHELF);
+                showAndFocus(SHELF, "Show in carousel");
             }).show();
         });
         if (Suggestions.showRecs(this)) {
@@ -557,9 +563,18 @@ public class SettingsActivity extends Activity {
                 row("At boot", () -> "Presentation starts instead", () -> show(PRESENT));
             }
         }
-        section("Home Screen");
+        section("Motion & Sound");
+        row("Motion", () -> Motion.NAMES[Motion.level()], () -> {
+            String[] names = {"Full  (default)", "Reduced \u2014 shorter, no drifting or swaying", "Off \u2014 changes are instant"};
+            dialog("Motion").setSingleChoiceItems(names, Motion.level(), (d, w) -> {
+                Motion.set(this, w);
+                d.dismiss();
+                refreshAll();
+            }).show();
+        });
         row("Navigation sounds", () -> Clicks.enabled(this) ? "On" : "Off",
                 () -> Clicks.setEnabled(this, !Clicks.enabled(this)));
+        section("Home Screen");
         row("Full-screen carousel when idle", () -> {
             int sec = Profiles.homePrefs(this).getInt("idle_sec", 20);
             return sec == 0 ? "Off" : "After " + sec + " s";
@@ -642,7 +657,7 @@ public class SettingsActivity extends Activity {
         dialog("When the TV turns on, open").setSingleChoiceItems(names.toArray(new String[0]), sel, (d, w) -> {
             Startup.set(this, targets.get(w), w == 0 ? "" : names.get(w));
             d.dismiss();
-            show(HOME);
+            showAndFocus(HOME, "Open");
         }).show();
     }
 
@@ -732,8 +747,19 @@ public class SettingsActivity extends Activity {
     }
 
     /** A settings row: label left, current value right; focus lifts it onto a light plate. */
+    /** This page's rows by label, so a page rebuilt after a choice can keep focus on that row. */
+    final java.util.Map<String, android.view.View> rowsByLabel = new java.util.HashMap<>();
+
+    /** Rebuilds a page (its rows can change after a choice) and keeps focus on the row just used. */
+    void showAndFocus(String p, String label) {
+        show(p);
+        android.view.View v = rowsByLabel.get(label);
+        if (v != null) v.requestFocus();
+    }
+
     android.view.View row(String label, Value value, Runnable action) {
         LinearLayout r = new LinearLayout(this);
+        rowsByLabel.put(label, r);
         r.setOrientation(LinearLayout.HORIZONTAL);
         r.setGravity(Gravity.CENTER_VERTICAL);
         r.setFocusable(true);
@@ -766,7 +792,7 @@ public class SettingsActivity extends Activity {
             bg.setColor(has ? 0xF2FFFFFF : 0x14FFFFFF);
             l.setTextColor(has ? 0xFF111114 : Color.WHITE);
             v.setTextColor(has ? 0x99111114 : 0x99FFFFFF);
-            view.animate().withLayer().scaleX(has ? 1.03f : 1f).scaleY(has ? 1.03f : 1f).setDuration(180).start();
+            view.animate().withLayer().scaleX(has ? 1.03f : 1f).scaleY(has ? 1.03f : 1f).setDuration(Motion.d(180)).start();
         });
         r.setOnClickListener(view -> {
             action.run();
@@ -801,7 +827,7 @@ public class SettingsActivity extends Activity {
             Suggestions.changed(this);
             refreshAll();
             d.dismiss();
-            show(SHELF);
+            showAndFocus(SHELF, "Source");
             if (w == 1 && !Suggestions.hasToken(this)) enterToken();
         }).show();
     }

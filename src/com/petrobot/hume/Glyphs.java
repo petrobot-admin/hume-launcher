@@ -72,6 +72,30 @@ final class Glyphs {
                 path.close();
                 c.drawPath(path, p);
                 break;
+            case "motion":  // a ball with two speed lines trailing it
+                p.setStyle(Paint.Style.FILL);
+                c.drawCircle(s * 0.66f, m, s * 0.17f, p);
+                p.setStyle(Paint.Style.STROKE);
+                c.drawLine(s * 0.14f, s * 0.38f, s * 0.38f, s * 0.38f, p);
+                c.drawLine(s * 0.22f, s * 0.62f, s * 0.38f, s * 0.62f, p);
+                break;
+            case "sound":  // a speaker with two sound waves
+                p.setStyle(Paint.Style.FILL);
+                path.moveTo(s * 0.14f, s * 0.4f);
+                path.lineTo(s * 0.28f, s * 0.4f);
+                path.lineTo(s * 0.46f, s * 0.22f);
+                path.lineTo(s * 0.46f, s * 0.78f);
+                path.lineTo(s * 0.28f, s * 0.6f);
+                path.lineTo(s * 0.14f, s * 0.6f);
+                path.close();
+                c.drawPath(path, p);
+                p.setStyle(Paint.Style.STROKE);
+                for (int i = 0; i < 2; i++) {
+                    float rad = s * (0.16f + 0.14f * i);
+                    r.set(s * 0.46f - rad, m - rad, s * 0.46f + rad, m + rad);
+                    c.drawArc(r, -45, 90, false, p);
+                }
+                break;
             case "timer":
                 c.drawCircle(m, m, s * 0.34f, p);
                 c.drawLine(m, m, m - s * 0.12f, m - s * 0.14f, p);

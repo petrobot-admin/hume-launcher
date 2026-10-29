@@ -130,7 +130,7 @@ final class SearchPanel {
             mic.setBackground(micBg);
             mic.setOnFocusChangeListener((v, has) -> {
                 paintMic();
-                v.animate().scaleX(has ? 1.12f : 1f).scaleY(has ? 1.12f : 1f).setDuration(180).setInterpolator(MainActivity.LIFT).start();
+                v.animate().scaleX(has ? 1.12f : 1f).scaleY(has ? 1.12f : 1f).setDuration(Motion.d(180)).setInterpolator(MainActivity.LIFT).start();
             });
             mic.setOnClickListener(v -> listen());
             paintMic();
@@ -221,7 +221,7 @@ final class SearchPanel {
         k.setOnFocusChangeListener((v, has) -> {
             bg.setColor(has ? Color.WHITE : 0x00FFFFFF);
             face.setTextColor(has ? 0xFF111114 : Color.WHITE);
-            v.animate().scaleX(has ? 1.15f : 1f).scaleY(has ? 1.15f : 1f).setDuration(150).start();
+            v.animate().scaleX(has ? 1.15f : 1f).scaleY(has ? 1.15f : 1f).setDuration(Motion.d(150)).start();
         });
         k.setOnClickListener(v -> click.run());
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(w, a.dp(34));
@@ -339,7 +339,7 @@ final class SearchPanel {
 
     void stopped() {
         listening = false;
-        if (mic != null) mic.animate().scaleX(mic.isFocused() ? 1.12f : 1f).scaleY(mic.isFocused() ? 1.12f : 1f).setDuration(150).start();
+        if (mic != null) mic.animate().scaleX(mic.isFocused() ? 1.12f : 1f).scaleY(mic.isFocused() ? 1.12f : 1f).setDuration(Motion.d(150)).start();
         paintMic();
         showQuery();
     }
@@ -756,9 +756,9 @@ final class SearchPanel {
         cell.addView(l, llp);
         cell.setOnFocusChangeListener((v, has) -> {
             art.animate().scaleX(has ? 1.1f : 1f).scaleY(has ? 1.1f : 1f).translationZ(has ? a.dp(10) : 0)
-                    .setDuration(200).setInterpolator(MainActivity.LIFT).start();
+                    .setDuration(Motion.d(200)).setInterpolator(MainActivity.LIFT).start();
             l.setAlpha(has ? 1f : 0.6f);
-            l.animate().translationY(has ? a.dp(5) : 0).setDuration(200).start();
+            l.animate().translationY(has ? a.dp(5) : 0).setDuration(Motion.d(200)).start();
         });
         art.setPivotY(h);
         art.setPivotX(w / 2f);
@@ -781,7 +781,7 @@ final class SearchPanel {
         t.setOnFocusChangeListener((v, has) -> {
             bg.setColor(has ? Color.WHITE : 0x26FFFFFF);
             t.setTextColor(has ? 0xFF111114 : Color.WHITE);
-            v.animate().scaleX(has ? 1.08f : 1f).scaleY(has ? 1.08f : 1f).setDuration(180).start();
+            v.animate().scaleX(has ? 1.08f : 1f).scaleY(has ? 1.08f : 1f).setDuration(Motion.d(180)).start();
         });
         t.setOnClickListener(v -> click.run());
         t.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, a.dp(30)));
@@ -816,7 +816,7 @@ final class SearchPanel {
                 if (url.equals(iv.getTag())) {
                     iv.setImageBitmap(b);
                     iv.setAlpha(0f);
-                    iv.animate().alpha(1f).setDuration(160).start();
+                    iv.animate().alpha(1f).setDuration(Motion.d(160)).start();
                     if (hideWhenLoaded != null) hideWhenLoaded.setVisibility(View.GONE);
                 }
             });
@@ -899,7 +899,7 @@ final class SearchPanel {
         layer.addView(s, a.match());
         sheet = s;
         s.setAlpha(0f);
-        s.animate().alpha(1f).setDuration(220).start();
+        s.animate().alpha(1f).setDuration(Motion.d(220)).start();
         if (!buttons.isEmpty()) buttons.get(0).requestFocus();
         else s.setFocusable(true);
         if (buttons.isEmpty()) s.requestFocus();
@@ -940,7 +940,7 @@ final class SearchPanel {
             bg.setColor(has ? Color.WHITE : 0x33FFFFFF);
             name.setTextColor(has ? 0xFF111114 : Color.WHITE);
             kind.setTextColor(has ? 0xFF111114 : Color.WHITE);
-            v.animate().scaleX(has ? 1.05f : 1f).scaleY(has ? 1.05f : 1f).setDuration(180).setInterpolator(MainActivity.LIFT).start();
+            v.animate().scaleX(has ? 1.05f : 1f).scaleY(has ? 1.05f : 1f).setDuration(Motion.d(180)).setInterpolator(MainActivity.LIFT).start();
         });
         b.setPivotX(0);
         b.setOnClickListener(v -> {
@@ -958,7 +958,7 @@ final class SearchPanel {
         FrameLayout s = sheet;
         sheet = null;
         if (s == null) return;
-        s.animate().alpha(0f).setDuration(180).withEndAction(() -> layer.removeView(s)).start();
+        s.animate().alpha(0f).setDuration(Motion.d(180)).withEndAction(() -> layer.removeView(s)).start();
         if (sheetReturn != null && sheetReturn.isAttachedToWindow()) sheetReturn.requestFocus();
         else firstKey().requestFocus();
     }

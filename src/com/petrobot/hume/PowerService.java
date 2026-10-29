@@ -50,6 +50,23 @@ public class PowerService extends AccessibilityService {
         registerReceiver(screenOn, new IntentFilter(Intent.ACTION_SCREEN_ON));
         // Bound early after boot, and allowed to open screens: a reliable boot trigger too.
         if (com.petrobot.hume.present.Presenter.justBooted()) Startup.onBoot(this);
+        // The stock launcher may already be on screen (just booted, or the switch was turned on
+        // over it): no window change will be reported for it, so look once now.
+        handler.postDelayed(this::homeIfStockShowing, 800);
+    }
+
+    private void homeIfStockShowing() {
+        if (!HomeButton.wanted(this)) return;
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        CharSequence pkg = root == null ? null : root.getPackageName();
+        if (pkg == null) return;
+        for (String h : HomeButton.stockHomes(this)) {
+            if (h.startsWith(pkg + "/")) {
+                lastRedirect = android.os.SystemClock.elapsedRealtime();
+                startActivity(new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                return;
+            }
+        }
     }
 
     @Override
