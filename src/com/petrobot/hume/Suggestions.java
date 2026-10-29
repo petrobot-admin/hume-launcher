@@ -224,6 +224,14 @@ final class Suggestions {
         cacheFile(c).delete();
     }
 
+    /**
+     * Refresh: mark the cached list out of date without deleting it, so the carousel keeps showing
+     * it until the new one has been fetched (instead of going empty for the length of a download).
+     */
+    static void expire(Context c) {
+        prefs(c).edit().putBoolean("expired", true).apply();
+    }
+
     static int version(Context c) {
         return prefs(c).getInt(K_VERSION, 0);
     }
@@ -240,7 +248,7 @@ final class Suggestions {
         File f = cacheFile(c);
         if (!f.exists()) return null;
         long maxAge = showNews(c) ? Math.min(News.refreshMinutes(c) * 60000L, MAX_AGE_MS) : MAX_AGE_MS;
-        if (!allowStale && System.currentTimeMillis() - f.lastModified() > maxAge) return null;
+        if (!allowStale && (prefs(c).getBoolean("expired", false) || System.currentTimeMillis() - f.lastModified() > maxAge)) return null;
         try {
             JSONArray a = new JSONArray(new String(readAll(new FileInputStream(f)), StandardCharsets.UTF_8));
             List<Item> out = new ArrayList<>();
@@ -276,6 +284,7 @@ final class Suggestions {
         try (OutputStream os = new FileOutputStream(cacheFile(c))) {
             os.write(a.toString().getBytes(StandardCharsets.UTF_8));
         }
+        prefs(c).edit().putBoolean("expired", false).apply();
         return out;
     }
 

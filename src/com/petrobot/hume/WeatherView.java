@@ -37,7 +37,36 @@ final class WeatherView extends View {
 
     void setData(Weather.Data d) {
         data = d;
+        if (!full) requestLayout();  // the pill fits its content
         invalidate();
+    }
+
+    /** The pill wraps its content: symbol, temperature, then the wider of place and condition. */
+    @Override
+    protected void onMeasure(int wSpec, int hSpec) {
+        if (full || MeasureSpec.getMode(wSpec) == MeasureSpec.EXACTLY) {
+            super.onMeasure(wSpec, hSpec);
+            return;
+        }
+        float w = COMPACT_W * u;
+        if (data != null) {
+            float pad = 16 * u, is = 24 * u;
+            p.setTypeface(regular);
+            p.setTextSize(24 * u);
+            p.setLetterSpacing(-0.03f);
+            float tw = p.measureText(data.temp + "\u00b0");
+            p.setLetterSpacing(0f);
+            p.setTypeface(semibold);
+            p.setTextSize(12.5f * u);
+            float pw = p.measureText(data.place.isEmpty() ? "My Location" : data.place)
+                    + (Weather.manual(getContext()) ? 0 : 11 * u);
+            p.setTypeface(regular);
+            p.setTextSize(11.5f * u);
+            float cw = p.measureText(Weather.describe(data.code, data.day));
+            w = pad + is + 8 * u + tw + 10 * u + Math.max(pw, cw) + pad + 2 * u;
+            w = Math.max(132 * u, Math.min(w, 250 * u));
+        }
+        setMeasuredDimension(Math.round(w), resolveSize(Math.round(COMPACT_H * u), hSpec));
     }
 
     @Override
@@ -50,17 +79,51 @@ final class WeatherView extends View {
         else drawCompact(c);
     }
 
-    /** A small glass pill: icon, temperature, then condition over place and high/low. */
+    /**
+     * The pill, in the manner of Apple's current weather widgets: a flat multicolour symbol, one
+     * clear temperature, then the place (with a location arrow when it follows the TV's location)
+     * over the condition in a quieter grey. High/low live in the forecast panel.
+     */
     private void drawCompact(Canvas c) {
         Weather.Data d = data;
-        float h = getHeight(), pad = 12 * u, is = 30 * u;
-        icon(c, d.code, d.day, pad, (h - is) / 2f, is);
-        float tx = pad + is + 6 * u;
-        float tw = text(c, d.temp + "\u00b0", tx, h / 2f + 8 * u, 22, regular, 1f, Paint.Align.LEFT);
-        float cx = tx + tw + 9 * u;
-        text(c, Weather.describe(d.code, d.day), cx, h / 2f - 2 * u, 11.5f, semibold, 1f, Paint.Align.LEFT);
-        text(c, (d.place.isEmpty() ? "" : d.place + "  ") + "H:" + d.max + "\u00b0 L:" + d.min + "\u00b0",
-                cx, h / 2f + 12 * u, 11.5f, medium, 0.7f, Paint.Align.LEFT);
+        float h = getHeight(), w = getWidth(), pad = 16 * u, is = 24 * u, mid = h / 2f;
+        icon(c, d.code, d.day, pad, mid - is / 2f, is);
+        float tx = pad + is + 8 * u;
+        p.setLetterSpacing(-0.03f);
+        float tw = text(c, d.temp + "\u00b0", tx, mid + 8.5f * u, 24, regular, 1f, Paint.Align.LEFT);
+        p.setLetterSpacing(0f);
+        float cx = tx + tw + 10 * u, room = w - cx - pad;
+        String place = d.place.isEmpty() ? "My Location" : d.place;
+        boolean here = !Weather.manual(getContext());
+        float arrow = here ? 11 * u : 0;
+        place = fit(place, room - arrow, 12.5f, semibold);
+        float pw = text(c, place, cx, mid - 2.5f * u, 12.5f, semibold, 1f, Paint.Align.LEFT);
+        if (here) locationArrow(c, cx + pw + 4.5f * u, mid - 7 * u, 6.5f * u);
+        text(c, fit(Weather.describe(d.code, d.day), room, 11.5f, regular), cx, mid + 12 * u, 11.5f, regular, 0.6f,
+                Paint.Align.LEFT);
+    }
+
+    /** Shortens text with an ellipsis to fit {@code max} px. */
+    private String fit(String s, float max, float size, android.graphics.Typeface tf) {
+        p.setTypeface(tf);
+        p.setTextSize(size * u);
+        if (p.measureText(s) <= max) return s;
+        int n = p.breakText(s, true, max - p.measureText("\u2026"), null);
+        return s.substring(0, Math.max(1, n)).trim() + "\u2026";
+    }
+
+    /** Apple's location arrow (location.fill): a small filled arrow pointing up-right. */
+    private void locationArrow(Canvas c, float x, float y, float s) {
+        android.graphics.Path a = new android.graphics.Path();
+        a.moveTo(x + s, y);
+        a.lineTo(x, y + s * 0.45f);
+        a.lineTo(x + s * 0.48f, y + s * 0.52f);
+        a.lineTo(x + s * 0.55f, y + s);
+        a.close();
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(0xFFFFFFFF);
+        p.setAlpha(230);
+        c.drawPath(a, p);
     }
 
     private void drawFull(Canvas c) {
