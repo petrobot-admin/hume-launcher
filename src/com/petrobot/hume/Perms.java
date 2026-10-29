@@ -79,7 +79,7 @@ final class Perms {
     static void requestTvListings(Activity a) {
         if (hasTvListings(a)) return;
         if (!WatchNext.supported()) {
-            new AlertDialog.Builder(a, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            Clicks.dialog(a)
                     .setTitle("Not available on this TV")
                     .setMessage("Continue Watching reads your apps' Watch Next lists, which need Android TV 8 or later.")
                     .setPositiveButton("OK", null).show();
@@ -115,7 +115,7 @@ final class Perms {
         // restarts it on reboot or when the switch is turned off and on again.
         String on = Settings.Secure.getString(a.getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
         boolean stale = on != null && on.contains(a.getPackageName() + "/");
-        new AlertDialog.Builder(a, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+        Clicks.dialog(a)
                 .setTitle(stale ? "Restart Hume\u2019s switch" : "Turn on Hume\u2019s switch")
                 .setMessage(why + (stale
                         ? "\n\nIt is on but Android has paused it. In the next screen, choose \u201cHume Launcher\u201d, turn it off, then on again."
@@ -131,7 +131,7 @@ final class Perms {
     static void requestAdmin(Activity a) {
         if (hasAdmin(a)) return;
         if (!adminSupported(a)) {
-            new AlertDialog.Builder(a, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            Clicks.dialog(a)
                     .setTitle("Not available on this TV")
                     .setMessage("This TV doesn't let apps turn the screen off, so Power Off and the Sleep Timer can't work "
                             + "here. Use the power button on the remote.")
@@ -141,7 +141,7 @@ final class Perms {
         if (!adminWorks(a)) {
             // Device admin is switched off on this TV: use Hume's accessibility switch instead.
             Intent acc = accessibilityScreen(a);
-            new AlertDialog.Builder(a, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            Clicks.dialog(a)
                     .setTitle("Turn on Power Off")
                     .setMessage("In the next screen, choose \u201cHume Launcher\u201d and turn it on. "
                             + "It lets Hume put the TV to sleep (and handle the Home button and Start with the TV).")
@@ -161,7 +161,7 @@ final class Perms {
     static void requestListener(Activity a) {
         if (hasListener(a)) return;
         if (!listenerSupported(a)) {
-            new AlertDialog.Builder(a, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            Clicks.dialog(a)
                     .setTitle("Not available on this TV")
                     .setMessage("This TV has limited memory, so Android doesn't give apps notification access. "
                             + "Do Not Disturb can't work here.")
@@ -236,7 +236,7 @@ final class Perms {
 
     /** Only when the TV has no screen for it: explain plainly, with the command for whoever installs the TV. */
     private static void lastResort(Activity a, String what, String cmd) {
-        new AlertDialog.Builder(a, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+        Clicks.dialog(a)
                 .setTitle(what)
                 .setMessage("This TV's settings have no switch for this permission. Whoever set up the TV can turn it on "
                         + "once from a computer on the same network:\n\n" + cmd)

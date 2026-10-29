@@ -163,7 +163,9 @@ Full-screen artwork behind the dock while a dock app is focused. One carousel ho
   RSS feeds with large images: Times of India, Hindustan Times, The Indian Express, India Today and
   News18 by default (NDTV and The Hindu optional). An editorial layout made for reading: headline,
   summary, section, newsroom and age; no button. Updates every 30 minutes (15/30/60).
-- Each profile chooses what it shows (Settings → Top Shelf / Continue Watching, or setup).
+- Each profile chooses what it shows: Settings → **Top Shelf** has a switch for each source, in the
+  carousel's order — Continue Watching, From Your Apps, Recommendations, News — then each one's
+  options (Clear history, which apps, source, services, newsrooms…). Setup asks the same.
 
 ## Idle full-screen carousel
 

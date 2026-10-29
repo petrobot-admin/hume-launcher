@@ -157,6 +157,18 @@ public class MainActivity extends Activity {
     View dockRow;
     boolean returningFromSettings;
     final java.util.concurrent.ExecutorService io = java.util.concurrent.Executors.newSingleThreadExecutor();
+    /**
+     * The carousel item on screen loads on its own thread, so a step never waits behind a refresh
+     * (network fetches on io) or artwork prefetching; a step you have already moved past is skipped.
+     */
+    final java.util.concurrent.ExecutorService heroIo = java.util.concurrent.Executors.newSingleThreadExecutor();
+    /** Artwork prefetch: low priority, nearest items first; a newer list stops an older run. */
+    final java.util.concurrent.ExecutorService prefetchIo = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "hume-prefetch");
+        t.setPriority(Thread.MIN_PRIORITY);
+        return t;
+    });
+    volatile int prefetchGen;
     final Runnable heroAdvance = () -> {
         if (this.search != null) scheduleAdvance();  // nothing to see under search; keep the slot
         else heroStep(1, false);
@@ -363,7 +375,7 @@ public class MainActivity extends Activity {
         if (SetupActivity.done(this) && !Perms.isDefaultHome(this) && !PowerService.HomeButton.active(this)
                 && !prefs.getBoolean("asked_default_home", false)) {
             prefs.edit().putBoolean("asked_default_home", true).apply();
-            new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            Clicks.dialog(this)
                     .setTitle("Make Hume your home screen?")
                     .setMessage("The Home button on the remote will open Hume Launcher.")
                     .setPositiveButton("Make Home Screen", (d, w) -> Perms.requestDefaultHome(this))
@@ -639,7 +651,8 @@ public class MainActivity extends Activity {
         weatherCard.setPivotY(0);
         weatherCard.setOnClickListener(v -> showWeather());
         // Top left, level with the status row and inside the same 48 px edge margin.
-        FrameLayout.LayoutParams wlp = new FrameLayout.LayoutParams(dp(WeatherView.COMPACT_W), dp(WeatherView.COMPACT_H),
+        // As wide as its content (the place name varies), like a tvOS capsule.
+        FrameLayout.LayoutParams wlp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(WeatherView.COMPACT_H),
                 Gravity.TOP | Gravity.START);
         wlp.topMargin = dp(24);
         wlp.leftMargin = dockOuter;
@@ -647,6 +660,7 @@ public class MainActivity extends Activity {
         updateWeather();
 
         setContentView(root);
+        Clicks.quiet(root);  // Android's own click sounds off: the Sounds switch decides
     }
 
     void buildGrid() {
@@ -1774,9 +1788,17 @@ public class MainActivity extends Activity {
         setHeroShown(dock);
         if (!(same && items.get(keep).title.equals(curTitle))) showHero(keep, 0);
         else for (int j = 0; j < heroDots.getChildCount(); j++) heroDots.getChildAt(j).setAlpha(j == keep ? 1f : 0.35f);
-        List<Suggestions.Item> pre = items;
-        io.execute(() -> {
+        // Download the artwork ahead, nearest to the current item first (both directions).
+        List<Suggestions.Item> pre = new ArrayList<>();
+        for (int d = 1; pre.size() < items.size() - 1 && d <= items.size(); d++) {
+            Suggestions.Item a = items.get((keep + d) % items.size()), b = items.get((keep - d + items.size()) % items.size());
+            if (!pre.contains(a) && a != items.get(keep)) pre.add(a);
+            if (!pre.contains(b) && b != items.get(keep)) pre.add(b);
+        }
+        int gen = ++prefetchGen;
+        prefetchIo.execute(() -> {
             for (Suggestions.Item it : pre) {
+                if (gen != prefetchGen) return;  // a newer list arrived
                 Suggestions.image(this, it.backdrop, "w1280", 64);  // downloads to disk; tiny decode
                 Suggestions.logoFor(this, it);
             }
@@ -1827,7 +1849,8 @@ public class MainActivity extends Activity {
             heroDots.getChildAt(i).animate().alpha(i == index ? 1f : 0.35f).setDuration(Motion.d(250)).start();
         }
         int want = index;
-        io.execute(() -> {
+        heroIo.execute(() -> {
+            if (heroIndex != want) return;  // already moved on: don't spend time on this one
             Bitmap raw = Suggestions.image(this, it.backdrop, "w1280", Math.min(1280, screenW));
             Bitmap bd = "news".equals(it.type) ? bakeNews(raw) : bakeScrims(raw);
             Bitmap bdBlur = Ui.glassBackdrop(bd, 160, 90);
@@ -2762,6 +2785,11 @@ public class MainActivity extends Activity {
 
     // ---------------------------------------------------------------- keys
 
+    /** Unused keys go to the views; a D-pad press nothing used moves focus here (no Android sound). */
+    boolean superDispatch(KeyEvent ev) {
+        return super.dispatchKeyEvent(ev) || Clicks.moveFocus(getWindow(), ev);
+    }
+
     @Override
     public boolean dispatchKeyEvent(KeyEvent ev) {
         if (launchOverlay != null) return true;
@@ -2770,6 +2798,11 @@ public class MainActivity extends Activity {
             if (ev.getAction() == KeyEvent.ACTION_DOWN) {
                 exitIdle();
                 swallowUp = true;
+                // Left / Right also move the carousel (it is what's on screen), instead of being lost.
+                int k = ev.getKeyCode();
+                if (k == KeyEvent.KEYCODE_DPAD_LEFT || k == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    heroStep(k == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1, true);
+                }
             }
             return true;
         }
@@ -2780,7 +2813,7 @@ public class MainActivity extends Activity {
         resetIdle();
         if (!replayingBack) navSound(this, ev);  // a replayed Back already clicked
         if (search != null && pickerLayer == search.layer && menuLayer == null) {
-            return search.dispatch(ev) || super.dispatchKeyEvent(ev);
+            return search.dispatch(ev) || superDispatch(ev);
         }
         if (pickerLayer == null && menuLayer == null && moveIndex < 0 && keyboardSearch(ev)) return true;
         if (pickerLayer == null && menuLayer == null && moveIndex < 0 && holdBackSearch(ev)) return true;
@@ -2809,7 +2842,7 @@ public class MainActivity extends Activity {
                 if (pd) pickerMove(pk);
                 return true;
             }
-            return super.dispatchKeyEvent(ev);
+            return superDispatch(ev);
         }
         if (menuLayer != null) {
             int mk = ev.getKeyCode();
@@ -2817,7 +2850,7 @@ public class MainActivity extends Activity {
                 if (ev.getAction() == KeyEvent.ACTION_UP) closeMenu();
                 return true;
             }
-            return super.dispatchKeyEvent(ev);
+            return superDispatch(ev);
         }
         if (heroKeys(ev)) return true;
         int k = ev.getKeyCode();
@@ -2833,7 +2866,7 @@ public class MainActivity extends Activity {
                 case KeyEvent.KEYCODE_ENTER:
                 case KeyEvent.KEYCODE_BACK:
                 case KeyEvent.KEYCODE_ESCAPE:      if (down) endMove(); return true;
-                default: return super.dispatchKeyEvent(ev);
+                default: return superDispatch(ev);
             }
         }
         if (k == KeyEvent.KEYCODE_MENU) {
@@ -2850,7 +2883,7 @@ public class MainActivity extends Activity {
             }
             return true;
         }
-        return super.dispatchKeyEvent(ev);
+        return superDispatch(ev);
     }
 
     // ---------------------------------------------------------------- apps
@@ -3696,11 +3729,9 @@ public class MainActivity extends Activity {
         refreshButton.animate().cancel();
         refreshButton.setRotation(0);
         refreshButton.animate().rotation(360).setDuration(Motion.d(700)).setInterpolator(EASE).start();
-        Suggestions.changed(this);
+        Suggestions.expire(this);  // keeps showing the current items until fresh ones arrive
         AppRows.invalidate();
         lastCwSig = "";
-        heroVersion = -1;
-        heroItems = new ArrayList<>();
         loadHero();
         Weather.refresh(this, true, this::updateWeather);
         toast("Refreshing");
@@ -4293,7 +4324,7 @@ public class MainActivity extends Activity {
                 items[i] = free.get(i) + "   " + Profiles.emojiName(free.get(i));
                 if (free.get(i).equals(prof.emoji)) cur = i;
             }
-            new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            Clicks.dialog(this)
                     .setTitle("Emoji")
                     .setSingleChoiceItems(items, cur, (d, w) -> {
                         prof.emoji = free.get(w);
@@ -4304,7 +4335,7 @@ public class MainActivity extends Activity {
                     }).show();
         });
         l.add("Change Colour");
-        act.add(() -> new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+        act.add(() -> Clicks.dialog(this)
                 .setTitle("Colour")
                 .setSingleChoiceItems(Profiles.COLOR_NAMES, prof.color, (d, w) -> {
                     prof.color = w;
@@ -4317,7 +4348,7 @@ public class MainActivity extends Activity {
         if (Profiles.list(this).size() > 1) {
             del = l.size();
             l.add("Delete");
-            act.add(() -> new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            act.add(() -> Clicks.dialog(this)
                     .setTitle("Delete \u201C" + prof.name + "\u201D?")
                     .setMessage("Its layout and Continue Watching list will be removed.")
                     .setPositiveButton("Delete", (d, w) -> {
@@ -4344,7 +4375,7 @@ public class MainActivity extends Activity {
         int pad = dp(14);
         box.setPadding(pad, pad / 2, pad, 0);
         box.addView(in);
-        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+        Clicks.dialog(this)
                 .setTitle(title)
                 .setView(box)
                 .setPositiveButton("Save", (d, w) -> {

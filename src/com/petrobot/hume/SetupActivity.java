@@ -72,6 +72,7 @@ public class SetupActivity extends Activity {
         page.setPadding(0, u(54), 0, u(28));
         root.addView(page, plp);
         setContentView(root);
+        Clicks.quiet(root);
 
         steps.add(this::hello);
         steps.add(this::profile);
@@ -447,7 +448,7 @@ public class SetupActivity extends Activity {
             FrameLayout box = new FrameLayout(this);
             box.setPadding(pad, pad / 2, pad, 0);
             box.addView(in);
-            new android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            Clicks.dialog(this)
                     .setTitle("Your name").setView(box)
                     .setPositiveButton("OK", (d, w) -> {
                         String n = in.getText().toString().trim();
@@ -737,7 +738,7 @@ public class SetupActivity extends Activity {
     @Override
     public boolean dispatchKeyEvent(android.view.KeyEvent ev) {
         MainActivity.navSound(this, ev);
-        return super.dispatchKeyEvent(ev);
+        return super.dispatchKeyEvent(ev) || Clicks.moveFocus(getWindow(), ev);
     }
 
     @Override

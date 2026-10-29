@@ -2,20 +2,20 @@ package com.petrobot.hume;
 
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
-import android.graphics.Shader;
 import android.util.LruCache;
 
 /**
- * Multicolour weather icons drawn in code, in the spirit of Apple's weather symbols: a yellow
- * sun, a pale moon, white clouds, blue rain, a yellow bolt. Keyed by WMO weather code.
+ * Multicolour weather icons drawn in code, in the manner of Apple's current SF Symbols: flat
+ * fills, no gradients or shading — a yellow sun, a white moon, white clouds (a grey one behind),
+ * cyan rain, a yellow bolt. Keyed by WMO weather code.
  */
 final class WeatherIcons {
     private static final LruCache<String, Bitmap> CACHE = new LruCache<>(48);
-    private static final int SUN_A = 0xFFFFE15A, SUN_B = 0xFFFFB300, RAIN = 0xFF4AB4FF, BOLT = 0xFFFFD60A;
+    private static final int SUN = 0xFFFFD60A, MOON = 0xFFF2F2F7, CLOUD = 0xFFFFFFFF, CLOUD_BACK = 0xFFA1A7B3,
+            RAIN = 0xFF5AC8FA, BOLT = 0xFFFFD60A;
 
     private WeatherIcons() {
     }
@@ -107,14 +107,15 @@ final class WeatherIcons {
 
     private static void sun(Canvas c, Paint p, float cx, float cy, float r, boolean rays) {
         p.setStyle(Paint.Style.FILL);
-        p.setShader(new LinearGradient(cx, cy - r, cx, cy + r, SUN_A, SUN_B, Shader.TileMode.CLAMP));
+        p.setShader(null);
+        p.setColor(SUN);
         c.drawCircle(cx, cy, r, p);
         if (!rays) return;
         p.setStyle(Paint.Style.STROKE);
         p.setStrokeCap(Paint.Cap.ROUND);
         p.setStrokeWidth(r * 0.28f);
         p.setShader(null);
-        p.setColor(SUN_B);
+        p.setColor(SUN);
         for (int i = 0; i < 8; i++) {
             double a = Math.PI / 4 * i;
             float x0 = (float) Math.cos(a), y0 = (float) Math.sin(a);
@@ -129,9 +130,9 @@ final class WeatherIcons {
         bite.addCircle(cx + r * 0.55f, cy - r * 0.4f, r * 0.82f, Path.Direction.CW);
         full.op(bite, Path.Op.DIFFERENCE);
         p.setStyle(Paint.Style.FILL);
-        p.setShader(new LinearGradient(cx, cy - r, cx, cy + r, 0xFFFFFFFF, 0xFFD9DCE8, Shader.TileMode.CLAMP));
-        c.drawPath(full, p);
         p.setShader(null);
+        p.setColor(MOON);
+        c.drawPath(full, p);
     }
 
     /** A cloud w wide (0.6 w tall) with its top-left at (l, t). */
@@ -148,11 +149,16 @@ final class WeatherIcons {
         part.addRoundRect(new RectF(l + w * 0.12f, t + h * 0.55f, l + w * 0.96f, t + h * 0.95f), h * 0.2f, h * 0.2f, Path.Direction.CW);
         path.op(part, Path.Op.UNION);
         p.setStyle(Paint.Style.FILL);
-        p.setShader(back
-                ? new LinearGradient(0, t, 0, t + h, 0xFFB8BECB, 0xFF8E95A3, Shader.TileMode.CLAMP)
-                : new LinearGradient(0, t, 0, t + h, 0xFFFFFFFF, 0xFFDDE1EA, Shader.TileMode.CLAMP));
-        c.drawPath(path, p);
         p.setShader(null);
+        // A thin gap where the cloud overlaps the sun, moon or a cloud behind (as SF Symbols do).
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(w * 0.07f);
+        p.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.CLEAR));
+        c.drawPath(path, p);
+        p.setXfermode(null);
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(back ? CLOUD_BACK : CLOUD);
+        c.drawPath(path, p);
     }
 
     private static void drops(Canvas c, Paint p, float s, int n, float len) {
