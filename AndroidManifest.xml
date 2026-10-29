@@ -44,6 +44,11 @@
         </intent>
         <!-- Continue Watching: the TV provider's Watch Next list. -->
         <provider android:authorities="android.media.tv" />
+        <!-- Home button override: the TV's own launcher(s), to recognise their home screen. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
     </queries>
 
     <application

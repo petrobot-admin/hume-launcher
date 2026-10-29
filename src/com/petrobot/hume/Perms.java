@@ -111,9 +111,15 @@ final class Perms {
                     + "adb shell settings put secure accessibility_enabled 1");
             return;
         }
+        // Switched on but not running: Android stops it when the app is force-stopped and only
+        // restarts it on reboot or when the switch is turned off and on again.
+        String on = Settings.Secure.getString(a.getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        boolean stale = on != null && on.contains(a.getPackageName() + "/");
         new AlertDialog.Builder(a, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle("Turn on Hume\u2019s switch")
-                .setMessage(why + "\n\nIn the next screen, choose \u201cHume Launcher\u201d and turn it on.")
+                .setTitle(stale ? "Restart Hume\u2019s switch" : "Turn on Hume\u2019s switch")
+                .setMessage(why + (stale
+                        ? "\n\nIt is on but Android has paused it. In the next screen, choose \u201cHume Launcher\u201d, turn it off, then on again."
+                        : "\n\nIn the next screen, choose \u201cHume Launcher\u201d and turn it on."))
                 .setPositiveButton("Open Accessibility", (d, w) -> tryStart(a, acc))
                 .setNegativeButton("Cancel", null).show();
     }

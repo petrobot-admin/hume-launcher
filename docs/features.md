@@ -222,6 +222,10 @@ home screen appears, from the Home button or Back out of an app. The stock launc
 may flash for a moment. Only the name of the window that opened is checked. Settings → Home →
 *Home button opens Hume* (shows *Not needed* when Hume is already the home app).
 
+If Hume is **force-stopped** (App info → Force stop, or some TV "cleaner" apps), Android pauses its
+switch until the TV restarts or the switch is turned off and on again; Hume's prompt says so.
+Ordinary memory pressure doesn't do this — Android restarts the switch by itself.
+
 ## Start with the TV
 
 Settings → Home → **Start with the TV**: open an app or an input (HDMI 1, …) **when the TV starts**,

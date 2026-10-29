@@ -89,6 +89,7 @@ public class SettingsActivity extends Activity {
         lastPage = page;
         page = p;
         list.removeAllViews();
+        rowsByLabel.clear();
         refreshers.clear();
         navRows.clear();
         buildLeft(p);
@@ -284,7 +285,7 @@ public class SettingsActivity extends Activity {
             dialog("Show in carousel").setSingleChoiceItems(names, sel, (d, w) -> {
                 Suggestions.setShelf(this, keys[w]);
                 d.dismiss();
-                show(SHELF);
+                showAndFocus(SHELF, "Show in carousel");
             }).show();
         });
         if (Suggestions.showRecs(this)) {
@@ -656,7 +657,7 @@ public class SettingsActivity extends Activity {
         dialog("When the TV turns on, open").setSingleChoiceItems(names.toArray(new String[0]), sel, (d, w) -> {
             Startup.set(this, targets.get(w), w == 0 ? "" : names.get(w));
             d.dismiss();
-            show(HOME);
+            showAndFocus(HOME, "Open");
         }).show();
     }
 
@@ -746,8 +747,19 @@ public class SettingsActivity extends Activity {
     }
 
     /** A settings row: label left, current value right; focus lifts it onto a light plate. */
+    /** This page's rows by label, so a page rebuilt after a choice can keep focus on that row. */
+    final java.util.Map<String, android.view.View> rowsByLabel = new java.util.HashMap<>();
+
+    /** Rebuilds a page (its rows can change after a choice) and keeps focus on the row just used. */
+    void showAndFocus(String p, String label) {
+        show(p);
+        android.view.View v = rowsByLabel.get(label);
+        if (v != null) v.requestFocus();
+    }
+
     android.view.View row(String label, Value value, Runnable action) {
         LinearLayout r = new LinearLayout(this);
+        rowsByLabel.put(label, r);
         r.setOrientation(LinearLayout.HORIZONTAL);
         r.setGravity(Gravity.CENTER_VERTICAL);
         r.setFocusable(true);
@@ -815,7 +827,7 @@ public class SettingsActivity extends Activity {
             Suggestions.changed(this);
             refreshAll();
             d.dismiss();
-            show(SHELF);
+            showAndFocus(SHELF, "Source");
             if (w == 1 && !Suggestions.hasToken(this)) enterToken();
         }).show();
     }

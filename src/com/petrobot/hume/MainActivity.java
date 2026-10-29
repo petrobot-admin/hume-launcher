@@ -359,7 +359,9 @@ public class MainActivity extends Activity {
         applyTabs();
         resetIdle();
         // Opened from the app list while another launcher is the home screen: offer once to take over.
-        if (SetupActivity.done(this) && !Perms.isDefaultHome(this) && !prefs.getBoolean("asked_default_home", false)) {
+        // Not asked while Hume's switch already sends the Home button here (the stock launcher stays default).
+        if (SetupActivity.done(this) && !Perms.isDefaultHome(this) && !PowerService.HomeButton.active(this)
+                && !prefs.getBoolean("asked_default_home", false)) {
             prefs.edit().putBoolean("asked_default_home", true).apply();
             new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                     .setTitle("Make Hume your home screen?")
@@ -1874,7 +1876,8 @@ public class MainActivity extends Activity {
             boolean app = "app".equals(it.type);
             List<String> meta = new ArrayList<>();
             meta.add(appLabel(it.pkg));
-            if (!it.genres.isEmpty()) meta.add(it.genres);  // Watch Next "Up Next" / "New", or the app's row name
+            // Watch Next "Up Next" / "New", or the app's row name (unless it just repeats the app's name)
+            if (!it.genres.isEmpty() && !it.genres.equalsIgnoreCase(meta.get(0))) meta.add(it.genres);
             if (it.remainingMin > 0) meta.add(it.remainingMin >= 60
                     ? (it.remainingMin / 60) + " h " + (it.remainingMin % 60) + " min left" : it.remainingMin + " min left");
             heroMeta.setText(String.join("  \u00B7  ", meta));
@@ -3018,10 +3021,17 @@ public class MainActivity extends Activity {
     }
 
     void reload(String focusKey) {
+        // An app installed or updated in the background (Play Store) mustn't pull focus out of the
+        // carousel the person is browsing.
+        boolean onShelf = shelfView.isFocused();
         loadApps();
         if (folderMode && hiddenApps.isEmpty()) folderMode = false;
         buildGrid();
         shelfEntry = null;
+        if (onShelf) {
+            focusedIndex = Math.min(focusedIndex, Math.max(0, shown.size() - 1));
+            return;
+        }
         int i = focusKey == null ? -1 : indexOfKey(focusKey);
         focusIndex(i >= 0 ? i : Math.min(focusedIndex, shown.size() - 1));
     }
